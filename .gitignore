@@ -1,0 +1,48 @@
+# Ignore editor and IDE settings
+.idea/
+.vscode/
+.cursor/
+.specify/
+.claude/
+.cache/
+.sync*
+
+# Ignore log files
+*.log
+
+# Ignore temporary files
+tmp/
+*.tar.gz
+
+# Ignore build and distribution directories
+backup/
+bin/
+pxpanel/
+dist/
+release/
+node_modules/
+
+# Ignore compiled binaries
+main
+pxpanel
+
+# Ignore OS specific files
+.DS_Store
+Thumbs.db
+
+# Ignore Go build files
+*.exe
+*.syso
+pxpanel.db
+pxpanel.db-shm
+pxpanel.db-wal
+system_metrics.gob
+*.dump
+
+# Ignore Docker specific files
+docker-compose.override.yml
+
+# Ignore .env (Environment Variables) file
+.env
+.pxverify.mod
+.pxverify.sum

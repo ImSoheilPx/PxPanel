@@ -1,0 +1,78 @@
+#cloud-config
+# ---------------------------------------------------------------------------
+# Generic pxpanel unattended install via cloud-init user-data.
+#
+# Works on any cloud-init platform: Hetzner, AWS, DigitalOcean, Vultr, GCP,
+# Azure, Oracle. Paste the whole file as the instance "user data".
+#
+# It installs the latest pxpanel release NON-INTERACTIVELY, generating unique
+# random credentials per instance. Full credentials are surfaced ONLY on the
+# serial console (owner-only); /etc/motd (world-readable) shows just the access
+# URL + username. Nothing is baked in advance — every instance is unique.
+#
+# Requires the non-interactive install.sh (pxpanel with PXPANEL_NONINTERACTIVE support).
+# Edit the exported PXPANEL_* knobs in /opt/pxpanel-bootstrap.sh below to customise.
+# ---------------------------------------------------------------------------
+
+package_update: true
+package_upgrade: false
+
+write_files:
+  - path: /opt/pxpanel-bootstrap.sh
+    permissions: '0700'
+    owner: root:root
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      export DEBIAN_FRONTEND=noninteractive
+
+      # --- Non-interactive install knobs --------------------------------------
+      export PXPANEL_NONINTERACTIVE=1
+      # SSL mode: none (plain HTTP, default) | ip | domain
+      export PXPANEL_SSL_MODE="${PXPANEL_SSL_MODE:-none}"
+      # Pin credentials instead of random (leave unset for secure random values):
+      #   export PXPANEL_USERNAME="admin2"
+      #   export PXPANEL_PASSWORD="change-me-please"
+      #   export PXPANEL_PANEL_PORT="2053"
+      #   export PXPANEL_WEB_BASE_PATH="panel"
+      # Let's Encrypt domain certificate instead of plain HTTP:
+      #   export PXPANEL_SSL_MODE="domain"
+      #   export PXPANEL_DOMAIN="panel.example.com"
+      #   export PXPANEL_ACME_EMAIL="you@example.com"
+      # PostgreSQL instead of SQLite:
+      #   export PXPANEL_DB_TYPE="postgres"
+      #   export PXPANEL_DB_DSN="postgres://user:pass@host:5432/db?sslmode=disable"
+      # ------------------------------------------------------------------------
+
+      curl -fsSL https://raw.githubusercontent.com/ImSoheilPx/pxpanel/main/install.sh | bash
+
+      # Surface the generated credentials. Full creds (incl. password + API token)
+      # go ONLY to the serial console (/dev/console, owner-only). /etc/motd is
+      # world-readable, so it gets just the access URL + username and a pointer
+      # to the root-only env file.
+      if [ -r /etc/pxpanel/install-result.env ]; then
+        {
+          echo
+          echo "=== pxpanel panel credentials (generated on first boot) ==="
+          cat /etc/pxpanel/install-result.env
+          echo "========================================================"
+          echo "Change the password after first login."
+        } > /dev/console 2>/dev/null || true
+
+        # shellcheck disable=SC1091
+        . /etc/pxpanel/install-result.env
+        {
+          echo
+          echo "=== pxpanel panel (generated on first boot) ==="
+          echo "URL:      ${PXPANEL_ACCESS_URL:-unknown}"
+          echo "Username: ${PXPANEL_USERNAME:-unknown}"
+          echo "Password + API token: sudo cat /etc/pxpanel/install-result.env"
+          echo "============================================="
+          echo "Change the password after first login."
+        } >> /etc/motd 2>/dev/null || true
+      fi
+
+runcmd:
+  - [bash, /opt/pxpanel-bootstrap.sh]
+
+final_message: "pxpanel installed — full credentials in /etc/pxpanel/install-result.env (sudo); /etc/motd shows the URL + username only."
