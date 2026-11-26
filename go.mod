@@ -3,6 +3,7 @@ module github.com/ImSoheilPx/pxpanel
 go 1.27.1
 
 require (
+	github.com/Jipok/wgctrl-go v1.3.1
 	github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20261116
 	github.com/apernet/quic-go v0.61.1-0.20260806010916-184d081eef3e
 	github.com/gin-contrib/gzip v1.2.10
@@ -38,7 +39,6 @@ require (
 	golang.org/x/sys v0.50.0
 	golang.org/x/text v0.44.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20241231184526-a9ab2273dd10
-	github.com/Jipok/wgctrl-go v1.2.0
 	google.golang.org/grpc v1.86.0-dev
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
@@ -46,6 +46,7 @@ require (
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.2
 	gvisor.dev/gvisor v0.0.0-20260122175437-89a5d21be8f0
+	layeh.com/radius v0.0.0-20231213012653-1006025d24f8
 	pgregory.net/rapid v1.3.0
 )
 
@@ -127,6 +128,5 @@ require (
 	golang.zx2c4.com/wireguard/windows v1.1.1 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261118221215-c8830f628b3f // indirect
 	layeh.com/gopher-luar v1.0.11 // indirect
-	layeh.com/radius v0.0.0-20231213012653-1006025d24f8 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
 )
