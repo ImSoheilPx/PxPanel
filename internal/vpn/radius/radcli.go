@@ -29,7 +29,8 @@ func GenerateRadiusClientConfig(protocol string, secret string) error {
 	// Create empty mapfile (port-id-map) if it doesn't exist — required by libradcli
 	mapFile := dir + "/port-id-map"
 	if _, err := os.Stat(mapFile); os.IsNotExist(err) {
-		os.WriteFile(mapFile, []byte(""), 0644)
+		// Best-effort stub: radcli tolerates its absence and pppd recreates it.
+		_ = os.WriteFile(mapFile, []byte(""), 0o644)
 	}
 
 	// Generate self-contained dictionary (written once, same content every time)

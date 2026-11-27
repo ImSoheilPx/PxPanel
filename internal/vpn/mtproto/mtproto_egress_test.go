@@ -85,7 +85,8 @@ password = "telemt-system"
 	})
 
 	t.Run("identical config is stable", func(t *testing.T) {
-		if egressConfig(direct) != egressConfig(direct) {
+		first, second := egressConfig(direct), egressConfig(direct)
+		if first != second {
 			t.Fatal("egressConfig is not deterministic")
 		}
 	})

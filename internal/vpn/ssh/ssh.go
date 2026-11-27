@@ -51,7 +51,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ImSoheilPx/pxpanel/internal/config"
 	"github.com/ImSoheilPx/pxpanel/internal/database/model"
 	"github.com/ImSoheilPx/pxpanel/internal/util/json_util"
 	"github.com/ImSoheilPx/pxpanel/internal/xray"
@@ -568,9 +567,6 @@ func (s *SshService) RenderClientConfigs(inbound *model.Inbound, email, endpoint
 	}
 	return out, nil
 }
-
-// panelVersion is the running panel version, reported as the SSH core "version".
-func sshPanelVersion() string { return config.GetPanelVersion() }
 
 // getInbound is the port of vpn-ui InboundService.GetInbound — the only
 // InboundService behaviour this service used (lookupAccount / accountLimit read the

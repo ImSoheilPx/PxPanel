@@ -52,7 +52,6 @@ import (
 	"math/big"
 	"math/bits"
 	"net"
-	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -79,8 +78,7 @@ import (
 
 // AwgService manages the awg data plane. See the package comment.
 type AwgService struct {
-	inboundService any // PORT NOTE: vpn-ui typed this InboundService; the inbound service is a later wave and this file never dereferences it. Shape kept as a placeholder.
-	nftService     nftables.Service
+	nftService nftables.Service
 
 	mu        sync.Mutex
 	firstSeen map[string]time.Time // deviceKey -> first-seen handshake (oldest-first eviction)
@@ -722,18 +720,6 @@ func (s *AwgService) AnyInterfaceUp() bool {
 		}
 	}
 	return false
-}
-
-// amneziawgModuleVersion reads the running amneziawg module version, or "kernel" when unreadable.
-func amneziawgModuleVersion() string {
-	b, err := os.ReadFile("/sys/module/amneziawg/version")
-	if err != nil {
-		return "kernel"
-	}
-	if v := strings.TrimSpace(string(b)); v != "" {
-		return v
-	}
-	return "kernel"
 }
 
 // AwgClientConfig is an account's rendered client config (for the panel + QR).

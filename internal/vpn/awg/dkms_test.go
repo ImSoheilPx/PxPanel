@@ -50,7 +50,7 @@ func TestAwgUnsupportedOnKernel71Plus(t *testing.T) {
 		if !ok {
 			t.Fatalf("could not parse %q", k)
 		}
-		if !(maj > 7 || (maj == 7 && min >= 1)) {
+		if maj < 7 || (maj == 7 && min < 1) {
 			t.Errorf("%q parsed as %d.%d, which the gate would wrongly allow", k, maj, min)
 		}
 	}

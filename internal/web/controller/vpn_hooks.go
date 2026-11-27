@@ -386,3 +386,49 @@ func (h *vpnHooks) reconcileForInbounds(inboundIds []int, needRestart bool) {
 		h.needRestart()
 	}
 }
+
+// reconcileInboundLevel fires each protocol's INBOUND-LEVEL change hook for the
+// protocol set a write touched — the on<L2tp>Changed() variants, not the
+// client-only ones reconcileForInbounds fires. vpn-ui wired the full hooks at
+// every inbound-level tail (addInbound, updateInbound, delInbound,
+// delInboundClient, the reseller cascade reconfigure): an inbound-level change
+// can move a port or a pool, so the daemon restart and the per-device
+// IP-allocation reset the client-only variants deliberately skip must run.
+// Callers pass the protocol(s) directly — after a delete the row is already gone,
+// so a lookup by id would silently reconcile nothing.
+func (h *vpnHooks) reconcileInboundLevel(protocols map[xrayProtocol]bool) {
+	for protocol := range protocols {
+		switch protocol {
+		case protoL2TP:
+			h.onL2tpChanged()
+		case protoPPTP:
+			h.onPptpChanged()
+		case protoOpenVPN:
+			h.onOpenVpnChanged()
+		case protoOpenConnect:
+			h.onOcservChanged()
+		case protoSSTP:
+			h.onSstpChanged()
+		case protoIKEV2:
+			h.onIkev2Changed()
+		case protoWGC:
+			h.onWgcChanged()
+		case protoAWG:
+			h.onAwgChanged()
+		case protoGRE:
+			h.onGreChanged()
+		case protoMTPROTO:
+			h.onMtprotoChanged()
+		case protoSSH:
+			h.onSshChanged()
+		case protoWireguardXra:
+			// Xray-native wireguard has no daemon, but its peers must exist before
+			// the core reads the config, and the core must then be restarted.
+			h.onWireguardXrayClientChanged()
+			h.needRestart()
+		default:
+			// Native Xray protocol: nothing to reconcile outside the core, the
+			// caller's restart covers it.
+		}
+	}
+}

@@ -99,8 +99,7 @@ import (
 
 // GreService manages the GRE data plane. See the package comment.
 type GreService struct {
-	inboundService any // PORT NOTE: vpn-ui typed this InboundService; the inbound service is a later wave and this file never dereferences it. Shape kept as a placeholder.
-	nftService     nftables.Service
+	nftService nftables.Service
 
 	mu        sync.Mutex
 	firstSeen map[string]time.Time // deviceKey -> first-seen, for oldest-first eviction
@@ -1183,15 +1182,6 @@ func ethtoolFeature(iface, feature string) string {
 		return fields[0]
 	}
 	return ""
-}
-
-// restoreGro puts an interface's GRO setting back to what it was before FOU needed it off.
-// Called from the GRE core's uninstall.
-func restoreGro(iface, prev string) error {
-	if prev != "on" && prev != "off" {
-		return fmt.Errorf("no usable previous GRO setting (%q)", prev)
-	}
-	return exec.Command("ethtool", "-K", iface, "gro", prev).Run()
 }
 
 // greWanIface returns the interface the default route uses, i.e. the one FOU packets arrive on.

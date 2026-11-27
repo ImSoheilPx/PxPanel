@@ -1,6 +1,7 @@
 package nftables
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,8 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ImSoheilPx/pxpanel/internal/logger"
 	"github.com/vishvananda/netlink"
+
+	"github.com/ImSoheilPx/pxpanel/internal/logger"
 )
 
 // The shared fwmark policy route.
@@ -232,10 +234,17 @@ func vpnPolicyRulePrefsFromJSON(out []byte, tokens map[string]bool) []int {
 // run is the caller's runCmd, so the add is still logged against the protocol
 // that asked for it.
 func EnsureVpnPolicyRoute(run func(name string, args ...string) error) {
+	// Best-effort: the two adds are idempotent re-applies on a steady-state host
+	// (the rule may already exist and the route is a replace), and the protocols'
+	// own nftables regeneration below is what surfaces a genuinely broken setup.
 	if !CollapseVpnPolicyRules(false) {
-		run("ip", "rule", "add", "fwmark", strconv.Itoa(vpnPolicyMark), "lookup", strconv.Itoa(vpnPolicyTable))
+		if err := run("ip", "rule", "add", "fwmark", strconv.Itoa(vpnPolicyMark), "lookup", strconv.Itoa(vpnPolicyTable)); err != nil {
+			logger.Warning("vpn policy route: ip rule add:", err)
+		}
 	}
-	run("ip", "route", "replace", "local", "0.0.0.0/0", "dev", "lo", "table", strconv.Itoa(vpnPolicyTable))
+	if err := run("ip", "route", "replace", "local", "0.0.0.0/0", "dev", "lo", "table", strconv.Itoa(vpnPolicyTable)); err != nil {
+		logger.Warning("vpn policy route: ip route replace:", err)
+	}
 }
 
 // CollapseVpnPolicyRules reduces the host to at most one policy rule and reports
@@ -298,10 +307,10 @@ func vpnPolicyRulePrefs(rules []netlink.Rule) []int {
 
 // vpnPolicyRuleShow reads the rule table as text, preferring JSON.
 func vpnPolicyRuleShow() []byte {
-	if out, err := exec.Command("ip", "-j", "rule", "show").Output(); err == nil &&
+	if out, err := exec.CommandContext(context.Background(), "ip", "-j", "rule", "show").Output(); err == nil &&
 		strings.HasPrefix(strings.TrimSpace(string(out)), "[") {
 		return out
 	}
-	out, _ := exec.Command("ip", "rule", "show").Output()
+	out, _ := exec.CommandContext(context.Background(), "ip", "rule", "show").Output()
 	return out
 }

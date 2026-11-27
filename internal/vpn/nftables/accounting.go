@@ -1,6 +1,7 @@
 package nftables
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -54,7 +55,7 @@ var AcctProtocols = []string{
 // echoed verbatim and quoted, and counterKey() already makes it unique per (protocol, ip),
 // so it is the one token that survives nft's formatting.
 func (s *Service) acctRuleHandles(chain, counter string) []string {
-	out, err := exec.Command("nft", "-a", "list", "chain", "ip", "vpn", chain).Output()
+	out, err := exec.CommandContext(context.Background(), "nft", "-a", "list", "chain", "ip", "vpn", chain).Output()
 	if err != nil {
 		return nil
 	}
@@ -92,9 +93,11 @@ func (s *Service) AddClientAccounting(protocol, ip string) error {
 	upCounter := fmt.Sprintf("%s_up_%s", protocol, counterIP)
 	downCounter := fmt.Sprintf("%s_down_%s", protocol, counterIP)
 
-	// Create counters (idempotent)
-	s.runCmd("nft", "add", "counter", "ip", "vpn", upCounter)
-	s.runCmd("nft", "add", "counter", "ip", "vpn", downCounter)
+	// Create counters (idempotent). Best-effort: runCmd logs its own failures at
+	// debug, and a missing counter only shows up as uncounted traffic, never as
+	// wrong billing.
+	_ = s.runCmd("nft", "add", "counter", "ip", "vpn", upCounter)
+	_ = s.runCmd("nft", "add", "counter", "ip", "vpn", downCounter)
 
 	s.reconcileAcctRule(NftAcctChain(protocol, "in"), upCounter, "saddr", ip)
 	s.reconcileAcctRule(NftAcctChain(protocol, "out"), downCounter, "daddr", ip)
@@ -113,9 +116,9 @@ func (s *Service) reconcileAcctRule(chain, counter, match, ip string) {
 		return // already exactly right
 	}
 	for _, h := range handles {
-		s.runCmd("nft", "delete", "rule", "ip", "vpn", chain, "handle", h)
+		_ = s.runCmd("nft", "delete", "rule", "ip", "vpn", chain, "handle", h)
 	}
-	s.runCmd("nft", "add", "rule", "ip", "vpn", chain, "ip", match, ip, "counter", "name", counter)
+	_ = s.runCmd("nft", "add", "rule", "ip", "vpn", chain, "ip", match, ip, "counter", "name", counter)
 }
 
 // RemoveClientAccounting removes nft accounting rules and counters for a PPP client.
@@ -133,13 +136,13 @@ func (s *Service) RemoveClientAccounting(protocol, ip string) error {
 		{NftAcctChain(protocol, "out"), downCounter},
 	} {
 		for _, h := range s.acctRuleHandles(dc.chain, dc.counter) {
-			s.runCmd("nft", "delete", "rule", "ip", "vpn", dc.chain, "handle", h)
+			_ = s.runCmd("nft", "delete", "rule", "ip", "vpn", dc.chain, "handle", h)
 		}
 	}
 
-	// Delete counters
-	s.runCmd("nft", "delete", "counter", "ip", "vpn", upCounter)
-	s.runCmd("nft", "delete", "counter", "ip", "vpn", downCounter)
+	// Delete counters (best-effort: runCmd logs its own failures at debug)
+	_ = s.runCmd("nft", "delete", "counter", "ip", "vpn", upCounter)
+	_ = s.runCmd("nft", "delete", "counter", "ip", "vpn", downCounter)
 
 	logger.Debugf("nft: removed %s accounting for %s", protocol, ip)
 	return nil
@@ -162,7 +165,7 @@ func (s *Service) ReadAndResetClientCounters(protocol, ip string) (up, down int6
 // resetCounter atomically reads+zeros one named counter, returning its bytes (0 if
 // missing/unparseable).
 func (s *Service) resetCounter(name string) int64 {
-	out, err := exec.Command("nft", "-j", "reset", "counter", "ip", "vpn", name).Output()
+	out, err := exec.CommandContext(context.Background(), "nft", "-j", "reset", "counter", "ip", "vpn", name).Output()
 	if err != nil {
 		return 0
 	}
@@ -193,7 +196,7 @@ func (s *Service) resetCounter(name string) int64 {
 // happens to name. A missing or zero entry means "unknown", which the billing
 // treats as "take the max across the account's memberships".
 func (s *Service) CollectAndResetTraffic(byProto map[string]map[string]string, byProtoInbound map[string]map[string]int) []*xray.ClientTraffic {
-	output, err := exec.Command("nft", "-j", "reset", "counters", "table", "ip", "vpn").Output()
+	output, err := exec.CommandContext(context.Background(), "nft", "-j", "reset", "counters", "table", "ip", "vpn").Output()
 	if err != nil {
 		return nil
 	}
@@ -259,9 +262,10 @@ func (s *Service) CollectAndResetTraffic(byProto map[string]map[string]string, b
 			pair = &trafficPair{}
 			traffic[key] = pair
 		}
-		if direction == "up" {
+		switch direction {
+		case "up":
 			pair.up += c.Bytes
-		} else if direction == "down" {
+		case "down":
 			pair.down += c.Bytes
 		}
 	}

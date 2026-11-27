@@ -20,6 +20,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -127,7 +128,8 @@ func startControlSocket(restarter ctlRestarter) error {
 	// start. Unlink it, but only after proving nothing answers on it, because a
 	// successful dial means a live panel owns it and stealing its socket would
 	// be worse than not having one.
-	if conn, derr := net.DialTimeout("unix", path, controlDialTimeout); derr == nil {
+	dialer := net.Dialer{Timeout: controlDialTimeout}
+	if conn, derr := dialer.DialContext(context.Background(), "unix", path); derr == nil {
 		_ = conn.Close()
 		return fmt.Errorf("another pxpanel is already serving %s", path)
 	}
@@ -135,7 +137,8 @@ func startControlSocket(restarter ctlRestarter) error {
 		return fmt.Errorf("remove stale control socket %s: %w", path, err)
 	}
 
-	ln, err := net.Listen("unix", path)
+	var lc net.ListenConfig
+	ln, err := lc.Listen(context.Background(), "unix", path)
 	if err != nil {
 		return err
 	}

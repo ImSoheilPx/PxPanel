@@ -97,11 +97,6 @@ import (
 // the vpn-ui bundle layout at the renamed root.
 const accelDictPath = "/usr/libexec/pxpanel-accel/share/accel-ppp/radius/dictionary"
 
-// accelBundleRoot mirrors vpn-ui backend.AccelBundleRoot with the product
-// rename. Kept next to accelDictPath so the two stay consistent; the bundle
-// build (accel-ppp-bundle.sh) must match this PREFIX.
-const accelBundleRoot = "/usr/libexec/pxpanel-accel"
-
 // SstpService is the SSTP protocol service (one accel-pppd per inbound).
 //
 // PORT NOTE: vpn-ui's inboundService/nftService fields were web/service types.
@@ -415,7 +410,8 @@ func (s *SstpService) generateServerConfig(inbound *model.Inbound) error {
 	}
 
 	dir := s.configDir(inbound.Id)
-	os.MkdirAll(dir, 0755)
+	// Best-effort: a failed create surfaces immediately in the config write below.
+	_ = os.MkdirAll(dir, 0o755)
 
 	conf := coreconfig.ApplyCoreConfigOverride("sstp", inbound.Id, "accel-ppp.conf",
 		s.buildServerConfig(inbound, settings))
@@ -559,7 +555,8 @@ func (s *SstpService) writeCertFiles(inbound *model.Inbound) error {
 	}
 
 	dir := s.configDir(inbound.Id)
-	os.MkdirAll(dir, 0755)
+	// Best-effort: a failed create surfaces immediately in the cert write below.
+	_ = os.MkdirAll(dir, 0o755)
 
 	if strings.TrimSpace(settings.Certificate) != "" {
 		if err := s.writeFile(dir+"/server.crt", settings.Certificate); err != nil {

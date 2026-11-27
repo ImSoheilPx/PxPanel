@@ -105,7 +105,31 @@ const (
 	updateHardCeiling = 2 * time.Hour
 )
 
+// restartSchedule bookkeeping for the most recent RestartPanel call. The
+// delayed restart itself is a bare goroutine, so this is the only record of
+// WHAT was scheduled and WHEN it is due — diagnostics and tests read it back
+// instead of racing wall clock on the restart hook (which other tests' own
+// delayed goroutines also fire into).
+var (
+	restartScheduleMu sync.Mutex
+	restartRequested  time.Time
+	restartDue        time.Time
+)
+
+// ScheduledRestart reports when the most recent panel restart was requested and
+// when the delayed restart it scheduled is due. Zero times mean nothing was
+// scheduled (yet).
+func ScheduledRestart() (requested, due time.Time) {
+	restartScheduleMu.Lock()
+	defer restartScheduleMu.Unlock()
+	return restartRequested, restartDue
+}
+
 func (s *PanelService) RestartPanel(delay time.Duration) error {
+	now := time.Now()
+	restartScheduleMu.Lock()
+	restartRequested, restartDue = now, now.Add(delay)
+	restartScheduleMu.Unlock()
 	go func() {
 		time.Sleep(delay)
 		if global.TriggerRestart() {

@@ -118,7 +118,9 @@ func vpnAfterInboundCreate(c *gin.Context, inbound *model.Inbound) {
 	}
 	vpnSyncInboundAccounts(inbound.Id)
 	if isVpnSurfaceProtocol(inbound.Protocol) {
-		vpnHooksService.reconcileForInbounds([]int{inbound.Id}, true)
+		// Inbound-level tail (vpn-ui addInbound): the FULL per-protocol hook — a
+		// new inbound's daemon must be brought up, not just its Xray pairing.
+		vpnHooksService.reconcileInboundLevel(map[xrayProtocol]bool{inbound.Protocol: true})
 	}
 }
 
@@ -137,7 +139,10 @@ func vpnAfterInboundDelete(c *gin.Context, id int, protocol model.Protocol) {
 		}
 	}
 	if isVpnSurfaceProtocol(protocol) {
-		vpnHooksService.reconcileForInbounds([]int{id}, true)
+		// Inbound-level tail (vpn-ui delInbound): the FULL per-protocol hook, fed
+		// the protocol remembered BEFORE the row went away — looking the inbound
+		// back up would find nothing and reconcile nothing.
+		vpnHooksService.reconcileInboundLevel(map[xrayProtocol]bool{protocol: true})
 	}
 }
 
@@ -148,7 +153,10 @@ func vpnAfterInboundUpdate(inbound *model.Inbound) {
 	}
 	vpnSyncInboundAccounts(inbound.Id)
 	if isVpnSurfaceProtocol(inbound.Protocol) {
-		vpnHooksService.reconcileForInbounds([]int{inbound.Id}, true)
+		// Inbound-level tail (vpn-ui updateInbound): the FULL per-protocol hook —
+		// a port/pool change needs the daemon restart + allocation reset the
+		// client-only variants skip.
+		vpnHooksService.reconcileInboundLevel(map[xrayProtocol]bool{inbound.Protocol: true})
 	}
 }
 

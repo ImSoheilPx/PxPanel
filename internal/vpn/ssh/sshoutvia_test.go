@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -78,7 +79,7 @@ func TestSshOutboundConfigBindsViaFromAFormPost(t *testing.T) {
 		"username": {"root"}, "authType": {"password"}, "socksPort": {"10810"},
 		"via": {"gre-b"},
 	}
-	req := httptest.NewRequest("POST", "/panel/xray/sshoutbound/save", strings.NewReader(form.Encode()))
+	req := httptest.NewRequest(http.MethodPost, "/panel/xray/sshoutbound/save", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	var cfg SshOutboundConfig
@@ -92,7 +93,7 @@ func TestSshOutboundConfigBindsViaFromAFormPost(t *testing.T) {
 	// An older panel, or a row whose Dialer Proxy was never touched, posts no `via` key
 	// at all. That has to bind as blank rather than fail the whole save.
 	form.Del("via")
-	req = httptest.NewRequest("POST", "/panel/xray/sshoutbound/save", strings.NewReader(form.Encode()))
+	req = httptest.NewRequest(http.MethodPost, "/panel/xray/sshoutbound/save", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	var absent SshOutboundConfig
 	if err := binding.Form.Bind(req, &absent); err != nil {

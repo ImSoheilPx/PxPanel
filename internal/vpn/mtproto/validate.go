@@ -1,7 +1,7 @@
 // Per-protocol validation of an MTProto inbound's settings JSON — the mtproto
 // slice of vpn-ui web/service/protocolvalidate.go (WAVE-2 P5), with the shared
 // checkers it reaches (settingsObject / optString / optBool / optInt /
-// checkClients / checkExternalProxy / checkUserLimit / checkEnum) carried along
+// checkClients / checkExternalProxy / checkUserLimit) carried along
 // verbatim so this wave is self-contained.
 //
 // TODO(protocolvalidate/controllers wave): the full validator table (vpn-ui
@@ -26,7 +26,6 @@ package mtproto
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
 	"strings"
 
@@ -158,33 +157,6 @@ func checkUserLimit(m map[string]any) error {
 		return common.NewErrorf(`"userLimit" must be 0 (no limit) or 1-%d (got %d)`, maxUserLimit, k)
 	}
 	return nil
-}
-
-// checkEnum accepts an absent or empty value (every one of these fields has a
-// server-side default for exactly that case) and rejects anything outside the set.
-func checkEnum(m map[string]any, key string, allowed ...string) error {
-	v, present, err := optString(m, key)
-	if err != nil {
-		return err
-	}
-	v = strings.TrimSpace(v)
-	if !present || v == "" {
-		return nil
-	}
-	for _, a := range allowed {
-		if v == a {
-			return nil
-		}
-	}
-	return common.NewErrorf("%q must be one of %s (got %q)", key, quotedList(allowed), v)
-}
-
-func quotedList(values []string) string {
-	quoted := make([]string, 0, len(values))
-	for _, v := range values {
-		quoted = append(quoted, fmt.Sprintf("%q", v))
-	}
-	return strings.Join(quoted, ", ")
 }
 
 // --- typed accessors ---------------------------------------------------------------

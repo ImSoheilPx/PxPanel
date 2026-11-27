@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
-	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -161,28 +160,6 @@ func pppOutResolveIface(linkname, want, proc string) string {
 		return want
 	}
 	return ""
-}
-
-// pppOutResolveV4 turns a configured server into a single IPv4 address. `what` names
-// the field in the error, because "cannot resolve" on its own does not tell an
-// operator which of the addresses they typed is the broken one.
-func pppOutResolveV4(server, what string) (net.IP, error) {
-	if ip := net.ParseIP(server); ip != nil {
-		if v4 := ip.To4(); v4 != nil {
-			return v4, nil
-		}
-		return nil, fmt.Errorf("the %s address %q is IPv6, and this client is IPv4 only", what, server)
-	}
-	ips, err := net.LookupIP(server)
-	if err != nil {
-		return nil, fmt.Errorf("cannot resolve the %s %q: %w", what, server, err)
-	}
-	for _, ip := range ips {
-		if v4 := ip.To4(); v4 != nil {
-			return v4, nil
-		}
-	}
-	return nil, fmt.Errorf("the %s %q has no IPv4 address", what, server)
 }
 
 // pppOutSafeName reduces a tag to something usable as a filename, a procmgr key and

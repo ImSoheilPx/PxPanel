@@ -451,7 +451,9 @@ func (t *sshTunnel) supervise() {
 		backoff = time.Second
 		t.client.Store(cl)
 		t.log.add("connected to " + t.cfg.Address)
-		cl.Wait() // blocks until the SSH connection drops
+		// Best-effort: the error only says WHY the session ended, which the
+		// reconnect logic below reacts to regardless.
+		_ = cl.Wait() // blocks until the SSH connection drops
 		t.client.Store(nil)
 		if !t.closing.Load() && t.gen.Load() == gen {
 			t.log.add("disconnected, reconnecting")
@@ -601,7 +603,8 @@ func (t *sshTunnel) handleSocks(conn net.Conn) {
 	}
 	host, err := socksReadAddr(br, reqHead[3])
 	if err != nil {
-		t.socksReply(conn, 0x08) // address type not supported
+		// Reply writes are best-effort: the client retransmits or times out.
+		_ = t.socksReply(conn, 0x08) // address type not supported
 		return
 	}
 	portBuf := make([]byte, 2)
@@ -611,13 +614,13 @@ func (t *sshTunnel) handleSocks(conn net.Conn) {
 	port := int(binary.BigEndian.Uint16(portBuf))
 
 	if reqHead[1] != 0x01 { // CONNECT only
-		t.socksReply(conn, 0x07) // command not supported
+		_ = t.socksReply(conn, 0x07) // command not supported
 		return
 	}
 
 	client := t.client.Load()
 	if client == nil {
-		t.socksReply(conn, 0x04) // host unreachable (tunnel down / reconnecting)
+		_ = t.socksReply(conn, 0x04) // host unreachable (tunnel down / reconnecting)
 		return
 	}
 	upstream, err := client.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(port)))

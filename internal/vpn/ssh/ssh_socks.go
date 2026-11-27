@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"bufio"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -23,7 +24,8 @@ const socksDialTimeout = 10 * time.Second
 // destHost:destPort. destHost is passed through as a domain when it is not an IP, so
 // Xray does the name resolution and can route by domain.
 func dialSocksConnect(port int, user, destHost string, destPort int) (net.Conn, error) {
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)), socksDialTimeout)
+	dialer := net.Dialer{Timeout: socksDialTimeout}
+	conn, err := dialer.DialContext(context.Background(), "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 	if err != nil {
 		return nil, err
 	}

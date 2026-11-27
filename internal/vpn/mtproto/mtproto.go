@@ -37,6 +37,7 @@ package mtproto
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -1256,7 +1257,12 @@ func (s *MtprotoService) scrapeMetrics(port int) (map[string]int64, map[string]i
 	down := map[string]int64{}
 
 	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/metrics", port))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet,
+		fmt.Sprintf("http://127.0.0.1:%d/metrics", port), nil)
+	if err != nil {
+		return up, down
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return up, down
 	}

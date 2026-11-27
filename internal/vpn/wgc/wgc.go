@@ -68,7 +68,6 @@ import (
 	"fmt"
 	"math/bits"
 	"net"
-	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -93,8 +92,7 @@ import (
 
 // WgcService manages the wg-c data plane. See the package comment.
 type WgcService struct {
-	inboundService any // PORT NOTE: vpn-ui typed this InboundService; the inbound service is a later wave and this file never dereferences it. Shape kept as a placeholder.
-	nftService     nftables.Service
+	nftService nftables.Service
 
 	mu        sync.Mutex
 	firstSeen map[string]time.Time // deviceKey -> first-seen handshake (drives oldest-first eviction order)
@@ -714,19 +712,6 @@ func (s *WgcService) AnyInterfaceUp() bool {
 		}
 	}
 	return false
-}
-
-// wireguardModuleVersion reads the running wireguard module's version, or "kernel" when
-// it is built-in / unreadable.
-func wireguardModuleVersion() string {
-	b, err := os.ReadFile("/sys/module/wireguard/version")
-	if err != nil {
-		return "kernel"
-	}
-	if v := strings.TrimSpace(string(b)); v != "" {
-		return v
-	}
-	return "kernel"
 }
 
 // WgcClientConfig is an account's rendered client config (for the panel + QR). Gateway

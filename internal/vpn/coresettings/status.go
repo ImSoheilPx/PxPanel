@@ -4,6 +4,7 @@
 package coresettings
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -33,55 +34,6 @@ import (
 	sstpsvc "github.com/ImSoheilPx/pxpanel/internal/vpn/sstp"
 	wgcsvc "github.com/ImSoheilPx/pxpanel/internal/vpn/wgc"
 )
-
-// vpnKernelModules are the REQUIRED kernel modules the L2TP/PPTP/OpenVPN backends
-// need. These are host/kernel-space and cannot be bundled into the binary — the
-// setup/provision step ensures they are loaded and persisted.
-var vpnKernelModules = []string{
-	"ppp_generic",       // PPP core
-	"l2tp_ppp",          // L2TP
-	"nf_conntrack_pptp", // PPTP
-	"ip_gre",            // PPTP/GRE
-	"ppp_mppe",          // MPPE
-	"nf_tproxy_ipv4",    // TPROXY (L2TP/PPTP/OpenVPN -> Xray)
-	"tun",               // OpenVPN tun device
-}
-
-// vpnOptionalKernelModules are loaded when the running kernel ships them but are
-// NOT required — their absence must not be flagged as a failure or trigger a
-// kernel-modules install / reboot.
-//
-//   - af_key (PF_KEY): legacy IPsec key-management interface. Modern libreswan uses
-//     the XFRM/netlink stack (built into the kernel, CONFIG_XFRM=y), not PF_KEY, and
-//     RHEL 10 / Rocky 10 dropped the af_key module entirely — so IPsec works fine
-//     without it. Loading it where present is harmless; its absence is expected.
-//   - esp4 / xfrm_user: the ESP transform + netlink XFRM interface the bundled
-//     strongSwan (IKEv2) drives through its kernel-netlink plugin — the SAME data-plane
-//     the existing L2TP/IPsec (libreswan) path already uses, so it is present on every
-//     validated target kernel (built-in, or a module the kernel autoloads on the first
-//     SA). Preloading them best-effort just avoids relying on that on-demand autoload;
-//     when they are built into the kernel there is no module to load and that is fine.
-var vpnOptionalKernelModules = []string{
-	"af_key",
-	"esp4",
-	"xfrm_user",
-	// wireguard: the in-kernel WireGuard (C) data plane (mainline since Linux 5.6),
-	// driven by wgctrl-go via netlink. Present on every validated target; optional so a
-	// kernel without it degrades to a Warn (kernel-only build, no userspace fallback yet)
-	// rather than failing provisioning. Autoloads on the first `ip link add type wireguard`.
-	"wireguard",
-	// amneziawg: the AmneziaWG data plane. Unlike every other entry here this module is
-	// NOT shipped by any distro kernel; the AWG feature step DKMS-builds it from the
-	// vendored source during setup. Listed so it shows up in the System card's module
-	// list once built (GetSystemStatus only renders an optional module when it is actually
-	// available, so it stays hidden rather than red on a host that never built it).
-	//
-	// It must stay OPTIONAL and out of vpnKernelModules: MissingKernelModules would
-	// otherwise always report it (no stock kernel has it), sending provisionKernelModules
-	// off to install a distro kernel package that cannot provide it and needlessly
-	// tripping the reboot/bootloader-pin path.
-	moduleAmneziawg,
-}
 
 // CoreState is the coarse health of a backend "core".
 type CoreState string
@@ -298,7 +250,8 @@ func procFileIsOne(path string) bool {
 // trying to bind: bind fails (address in use) → taken; bind succeeds → the port
 // is free, meaning Xray failed to bind it.
 func dokodemoPortBound(port int) bool {
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	var lc net.ListenConfig
+	ln, err := lc.Listen(context.Background(), "tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return true
 	}
@@ -811,7 +764,8 @@ func (s *CoreService) radiusStatus() CoreStatus {
 	cs.Version = config.GetPanelVersion()
 	// The embedded RADIUS server binds 127.0.0.1:1812 (auth). If the port can't
 	// be bound, the server is already listening — which is what we want.
-	pc, err := net.ListenPacket("udp", "127.0.0.1:1812")
+	var lc net.ListenConfig
+	pc, err := lc.ListenPacket(context.Background(), "udp", "127.0.0.1:1812")
 	if err != nil {
 		cs.State = CoreRunning
 		return cs

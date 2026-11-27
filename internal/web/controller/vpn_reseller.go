@@ -225,43 +225,17 @@ func (a *VpnResellerController) del(c *gin.Context) {
 }
 
 // reconfigureAfterCascade regenerates and restarts the daemons whose clients a
-// cascade delete removed, reusing the per-protocol change hooks so the reconfigure
-// sequence lives in one place (and matches the single-client delete route exactly).
+// cascade delete removed, through the FULL per-protocol change hooks
+// (vpn-ui reconfigureAfterCascade: on<L2tp>Changed() etc. — a cascade is an
+// inbound-level event, so daemon restarts and allocation-cache resets run, which
+// the client-only reconcile variants skip).
 func reconfigureAfterCascade(res reseller.DeleteResult) {
 	if len(res.Protocols) == 0 && !res.NeedXrayRestart {
 		return
 	}
-	h := vpnHooksService
-	for proto := range res.Protocols {
-		switch proto {
-		case protoL2TP:
-			h.onL2tpClientChanged()
-		case protoPPTP:
-			h.onPptpClientChanged()
-		case protoOpenVPN:
-			h.onOpenVpnClientChanged()
-		case protoOpenConnect:
-			h.onOcservClientChanged()
-		case protoSSTP:
-			h.onSstpClientChanged()
-		case protoIKEV2:
-			h.onIkev2ClientChanged()
-		case protoWGC:
-			h.onWgcClientChanged()
-		case protoAWG:
-			h.onAwgClientChanged()
-		case protoGRE:
-			h.onGreClientChanged()
-		case protoMTPROTO:
-			h.onMtprotoClientChanged()
-		case protoSSH:
-			h.onSshClientChanged()
-			// Native Xray protocols (vmess/vless/trojan/shadowsocks/wireguard) have no
-			// daemon; the live RemoveUser already ran, so NeedXrayRestart covers them.
-		}
-	}
+	vpnHooksService.reconcileInboundLevel(res.Protocols)
 	if res.NeedXrayRestart {
-		h.needRestart()
+		vpnHooksService.needRestart()
 	}
 }
 

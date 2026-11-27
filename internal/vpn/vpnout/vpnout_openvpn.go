@@ -1025,7 +1025,9 @@ func (ovpnOutDriver) Up(cfg VpnOutboundConfig) (string, error) {
 
 	// modprobe before anything else: without /dev/net/tun OpenVPN dies at device-open time
 	// with a message about permissions that sends people looking in the wrong place.
-	(&ovpnOutHost{}).runCmd("modprobe", "tun")
+	// Best-effort: on a kernel with tun built in there is nothing to load, and the
+	// device-open failure is what surfaces a genuinely missing one.
+	_ = (&ovpnOutHost{}).runCmd("modprobe", "tun")
 
 	// migrateFromSystemd's one-shot cleanup ends with `pkill -KILL -f <openvpn binary path>`,
 	// which matches EVERY openvpn on the box including this one. It is a sync.Once, and on a

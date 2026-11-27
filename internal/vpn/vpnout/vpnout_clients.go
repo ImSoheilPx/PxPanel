@@ -194,13 +194,6 @@ var clientBundleExtractPppd = func() error {
 	return fmt.Errorf("no pppd bundle is linked into this build, so the bundled pppd cannot be extracted")
 }
 
-// clientBundleUsingPppd reports whether the bundled pppd is in play rather than
-// the host's (vpn-ui backend.UsingBundledPppd). Present for the seam's
-// completeness; the SSTP driver deliberately does not consult it (see its
-// header comment: the bundled pppd is invoked by absolute path because the
-// OpenSSL legacy provider it needs is a HOST-DEFAULT-ABSENT feature).
-var clientBundleUsingPppd = func() bool { return procmgr.Bundles().UsingBundledPppd() }
-
 // clientBundlePppdPath is the absolute path the SSTP driver execs for pppd
 // (vpn-ui backend.PppdBundled, the fixed PppdBundleRoot + "/sbin/pppd"). The
 // bundle wave owns the concrete root; the BundleProvider's PppdBundledPath is

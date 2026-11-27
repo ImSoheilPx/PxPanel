@@ -508,7 +508,9 @@ func (s *L2tpService) RestartServices() error {
 	}
 
 	if len(inbounds) == 0 {
-		procmgr.GetProcManager().Stop("xl2tpd")
+		// Teardown best-effort: nothing is left to serve, and a failed stop is
+		// retried (or surfaces) on the next reconcile.
+		_ = procmgr.GetProcManager().Stop("xl2tpd")
 		return nil
 	}
 

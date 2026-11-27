@@ -479,12 +479,10 @@ func EnsureLibreswan() ProvisionStep {
 // root-only box this reports that failure verbatim rather than hiding it.
 func installLibreswanFromAUR() (string, error) {
 	var b strings.Builder
-	tried := false
 	for _, helper := range []string{"yay", "paru"} {
 		if !commandExists(helper) {
 			continue
 		}
-		tried = true
 		args := []string{"-S", "--needed", "--noconfirm", "libreswan"}
 		out, err := exec.Command(helper, args...).CombinedOutput()
 		b.WriteString("\n$ " + helper + " " + strings.Join(args, " ") + "\n")
@@ -494,10 +492,7 @@ func installLibreswanFromAUR() (string, error) {
 		}
 		return b.String(), fmt.Errorf("%s couldn't build libreswan: %s", helper, lastNonEmptyLine(string(out)))
 	}
-	if !tried {
-		return b.String(), fmt.Errorf("no AUR helper found (install yay or paru)")
-	}
-	return b.String(), fmt.Errorf("AUR install did not produce the 'ipsec' command")
+	return b.String(), fmt.Errorf("no AUR helper found (install yay or paru)")
 }
 
 // InitIpsecNSS initializes libreswan's NSS database if missing, returning the

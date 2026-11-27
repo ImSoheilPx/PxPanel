@@ -312,14 +312,7 @@ func (s *Ikev2Service) GetDokodemoConfig(inbound *model.Inbound) *xray.InboundCo
 	}
 }
 
-// charonBin / swanctlBin resolve the bundled launchers (or a host binary from PATH).
-func (s *Ikev2Service) charonBin() string {
-	if p := procmgr.Bundles().StrongswanBinPath("charon"); p != "" {
-		return p
-	}
-	return "charon"
-}
-
+// swanctlBin resolves the bundled launcher (or a host binary from PATH).
 func (s *Ikev2Service) swanctlBin() string {
 	if p := procmgr.Bundles().StrongswanBinPath("swanctl"); p != "" {
 		return p
@@ -601,29 +594,6 @@ func (s *Ikev2Service) writeStrongswanConf(inbounds []*model.Inbound) error {
 
 // certBaseName returns the per-inbound cert/key filename stem.
 func (s *Ikev2Service) certBaseName(id int) string { return fmt.Sprintf("ikev2-%d", id) }
-
-// certPaths returns the server cert + key paths charon should load. Path mode uses the
-// operator's own files verbatim; content mode uses the swanctl standard dirs.
-func (s *Ikev2Service) certPaths(inbound *model.Inbound, settings *ikev2Settings) (certPath, keyPath string) {
-	if settings.TlsUseFile && strings.TrimSpace(settings.CertificateFile) != "" && strings.TrimSpace(settings.KeyFile) != "" {
-		return strings.TrimSpace(settings.CertificateFile), strings.TrimSpace(settings.KeyFile)
-	}
-	base := s.certBaseName(inbound.Id)
-	return swanctlX509 + "/" + base + "-server.pem", swanctlPrivate + "/" + base + "-server.key"
-}
-
-// hasUsableCert reports whether a server cert+key exists (content written, or an
-// operator path that exists). charon needs a server cert for EAP/cert modes.
-func (s *Ikev2Service) hasUsableCert(inbound *model.Inbound, settings *ikev2Settings) bool {
-	certPath, keyPath := s.certPaths(inbound, settings)
-	if _, err := os.Stat(certPath); err != nil {
-		return false
-	}
-	if _, err := os.Stat(keyPath); err != nil {
-		return false
-	}
-	return true
-}
 
 // writeCertFiles publishes the server cert + key into the swanctl credential dirs
 // (/etc/swanctl/x509 + /etc/swanctl/private), where writeConnConf's `certs =
@@ -1049,10 +1019,13 @@ func (s *Ikev2Service) mssClampRules() []string {
 // (register.go) — so this regeneration keeps the other protocols' TPROXY rules
 // instead of dropping them (vpn-ui behaviour).
 func (s *Ikev2Service) SetupRouting() error {
-	s.runCmd("sysctl", "-w", "net.ipv4.ip_forward=1")
-	// Best-effort XFRM/ESP module preload (built-in on most kernels).
-	s.runCmd("modprobe", "esp4")
-	s.runCmd("modprobe", "xfrm_user")
+	// Best-effort: forwarding is usually already on for the other VPN protocols,
+	// and a failure surfaces in the routing self-heal job.
+	_ = s.runCmd("sysctl", "-w", "net.ipv4.ip_forward=1")
+	// Best-effort XFRM/ESP module preload (built-in on most kernels — EPERM or
+	// "already loaded" is fine, the data plane errors visibly if ESP is unusable).
+	_ = s.runCmd("modprobe", "esp4")
+	_ = s.runCmd("modprobe", "xfrm_user")
 
 	nftables.EnsureVpnPolicyRoute(s.runCmd)
 

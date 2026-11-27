@@ -13,7 +13,6 @@ import (
 	"github.com/ImSoheilPx/pxpanel/internal/database/model"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/defaults"
 	"github.com/ImSoheilPx/pxpanel/internal/web/service"
-	"github.com/ImSoheilPx/pxpanel/internal/xray"
 
 	"github.com/gin-gonic/gin"
 )
@@ -40,9 +39,6 @@ var (
 // xrayProtocol is the switch type of reconcileForInbounds; a plain alias so the
 // map keys stay readable.
 type xrayProtocol = model.Protocol
-
-// modelWireguard is the string the Xray-native wireguard inbound carries.
-const modelWireguard = model.Protocol("wireguard")
 
 // The seams the web server fills at start-up (vpn_wire.go, called from web.go
 // Server.start). Nil until then; every consumer degrades to its fallback.
@@ -97,7 +93,3 @@ func browserHost(c *gin.Context) string {
 	}
 	return host
 }
-
-// vpnClientTraffic is the *xray.ClientTraffic alias the controllers mention in
-// scoped read filters.
-type vpnClientTraffic = xray.ClientTraffic

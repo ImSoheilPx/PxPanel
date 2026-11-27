@@ -1230,7 +1230,7 @@ var vpnOutIfaceAddrs = func(iface string) ([]net.IP, error) {
 	out := make([]net.IP, 0, len(addrs))
 	for _, a := range addrs {
 		if a.IPNet != nil {
-			out = append(out, a.IPNet.IP)
+			out = append(out, a.IP)
 		}
 	}
 	return out, nil

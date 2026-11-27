@@ -22,6 +22,7 @@ package accounts
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -36,17 +37,6 @@ import (
 
 	"gorm.io/gorm"
 )
-
-// accountOwnedKeys are the settings-JSON keys the account row is authoritative
-// for. Everything else in an entry belongs to the membership or the protocol and
-// is passed through untouched.
-//
-// Credential keys are deliberately NOT in this list: which of them an account
-// owns depends on the protocol, so they are applied by applyAccountCredential.
-var accountOwnedKeys = []string{
-	"email", "subId", "totalGB", "expiryTime", "enable",
-	"reset", "limitIp", "tgId", "comment",
-}
 
 // applyAccountCredential writes the credential fields the given protocol keys on.
 //
@@ -379,7 +369,7 @@ func removeAccountFromInbound(inbound *model.Inbound, email string) (string, boo
 func (s *AccountService) SyncInboundAccounts(tx *gorm.DB, inboundId int) error {
 	var inbound model.Inbound
 	if err := tx.Model(&model.Inbound{}).Where("id = ?", inboundId).First(&inbound).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// The inbound is gone: drop every membership pointing at it. An account
 			// that is on OTHER inbounds survives, which is why the memberships go
 			// rather than the accounts.
@@ -466,7 +456,7 @@ func (s *AccountService) upsertAccountFromEntry(tx *gorm.DB, entry map[string]an
 	var account model.Account
 	err := tx.Where("LOWER(TRIM(email)) = ?", key).First(&account).Error
 	switch {
-	case err == gorm.ErrRecordNotFound:
+	case errors.Is(err, gorm.ErrRecordNotFound):
 		fresh := newAccountFromEntry(entry)
 		extractAccountCredential(fresh, entry, protocol)
 		// The columns the entry carries for OTHER protocols. extractAccountCredential
@@ -690,7 +680,7 @@ func (s *AccountService) upsertMembership(tx *gorm.DB, accountId int, inbound *m
 	var existing model.AccountInbound
 	err := tx.Where("account_id = ? AND inbound_id = ?", accountId, inbound.Id).First(&existing).Error
 	switch {
-	case err == gorm.ErrRecordNotFound:
+	case errors.Is(err, gorm.ErrRecordNotFound):
 		return tx.Create(&membership).Error
 	case err != nil:
 		return err
@@ -963,7 +953,7 @@ func (s *AccountService) SaveAccountWithoutInbound(entry map[string]any) (*model
 		}
 		var traffic xray.ClientTraffic
 		trafficErr := tx.Where("LOWER(TRIM(email)) = ?", key).First(&traffic).Error
-		if trafficErr != nil && trafficErr != gorm.ErrRecordNotFound {
+		if trafficErr != nil && !errors.Is(trafficErr, gorm.ErrRecordNotFound) {
 			return trafficErr
 		}
 		hasTraffic := trafficErr == nil

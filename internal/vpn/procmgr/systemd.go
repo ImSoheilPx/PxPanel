@@ -233,12 +233,12 @@ func (s *SystemdService) SaveService(req SaveServiceRequest) error {
 		return err
 	}
 	if out, err := systemctl("daemon-reload"); err != nil {
-		return fmt.Errorf("daemon-reload failed: %v: %s", err, out)
+		return fmt.Errorf("daemon-reload failed: %w: %s", err, out)
 	}
 
 	if req.Enable {
 		if out, err := systemctl("enable", name); err != nil {
-			return fmt.Errorf("enable failed: %v: %s", err, out)
+			return fmt.Errorf("enable failed: %w: %s", err, out)
 		}
 	} else {
 		_, _ = systemctl("disable", name)
@@ -246,7 +246,7 @@ func (s *SystemdService) SaveService(req SaveServiceRequest) error {
 
 	if req.Start {
 		if out, err := systemctl("restart", name); err != nil {
-			return fmt.Errorf("start failed: %v: %s", err, out)
+			return fmt.Errorf("start failed: %w: %s", err, out)
 		}
 	} else {
 		_, _ = systemctl("stop", name)

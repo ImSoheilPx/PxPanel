@@ -654,7 +654,7 @@ func TestQuoteResetCycleNeverPaysTheReseller(t *testing.T) {
 	const delivered = 30 * gb
 	if spent != 26*gb {
 		t.Errorf("the cycle cost %d; want %d, the figure this test pins while the "+
-			"deduct leak is open (correctly priced it is %d)", spent, int64(26*gb), int64(delivered))
+			"deduct leak is open (correctly priced it is %d)", spent, 26*gb, delivered)
 	}
 }
 
@@ -711,7 +711,7 @@ func TestQuoteResetThenDeductRefundsHeadroomTheAccountKeeps(t *testing.T) {
 	// traffic the customer is now free to move.
 	if pair := reset.DeltaSpent + deduct.DeltaSpent; pair != 0 {
 		t.Errorf("the reset and deduct together cost %d; want 0, the figure this "+
-			"test pins while the leak is open (correctly priced it is %d)", pair, int64(9*gb))
+			"test pins while the leak is open (correctly priced it is %d)", pair, 9*gb)
 	}
 }
 
@@ -928,7 +928,7 @@ func TestQuoteNegativeSpentBytesIsClampedToTheAllowance(t *testing.T) {
 		t.Fatalf("Quote for the whole allowance: %v", err)
 	}
 	if got.DeltaSpent != 10*gb {
-		t.Errorf("DeltaSpent = %d; want the %d allowance", got.DeltaSpent, int64(10*gb))
+		t.Errorf("DeltaSpent = %d; want the %d allowance", got.DeltaSpent, 10*gb)
 	}
 
 	if _, err := Quote(QuoteInput{Profile: profile, Create: true, NewTotal: 10*gb + 1}); !errors.Is(err, ErrInsufficientBalance) {

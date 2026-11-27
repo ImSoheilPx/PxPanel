@@ -24,12 +24,18 @@ import (
 	"github.com/ImSoheilPx/pxpanel/internal/web/entity"
 	"github.com/ImSoheilPx/pxpanel/internal/web/global"
 	"github.com/ImSoheilPx/pxpanel/internal/web/service"
+	"github.com/ImSoheilPx/pxpanel/internal/web/service/panel"
 )
 
 func TestPanelRestartScopeAndDelayedHook(t *testing.T) {
 	engine, auth := newAPIAuthTestEngine(t)
 	NewSettingController(engine.Group("/panel/api", auth.checkAPIAuth, auth.enforceTokenScope))
-	restarts := make(chan time.Time, 1)
+	// Roomier than the event count this test generates: sibling tests in this
+	// binary (import DB, the serving-report test below) leave 3s-delayed
+	// RestartPanel goroutines behind, and under -shuffle their hook sends can
+	// land in this channel while it is ours — a small buffer would block those
+	// foreign goroutines on this test's send instead.
+	restarts := make(chan time.Time, 16)
 	global.SetRestartHook(func() { restarts <- time.Now() })
 	t.Cleanup(func() { global.SetRestartHook(func() {}) })
 	for _, scope := range []string{model.ApiScopeAdmin, model.ApiScopeNodeAdmin, model.ApiScopeNodeSync, model.ApiScopeMonitor} {
@@ -60,17 +66,38 @@ func TestPanelRestartScopeAndDelayedHook(t *testing.T) {
 				if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil || !result.Success || w.Code != http.StatusOK {
 					t.Fatalf("accepted = %d %s: %v", w.Code, w.Body.String(), err)
 				}
+				// The DELAY is asserted on the schedule the handler recorded, not on
+				// wall clock around the hook: the hook is process-global and delayed
+				// goroutines from sibling tests fire into it under -shuffle, so a
+				// sub-3s event here may belong to another test's request entirely.
+				// The schedule is per-request bookkeeping and immune to that.
+				requested, due := panel.ScheduledRestart()
+				if requested.Before(start) {
+					t.Fatalf("restart was scheduled at %s, before this request started at %s", requested, start)
+				}
+				if delay := due.Sub(requested); delay != 3*time.Second {
+					t.Fatalf("restart delay = %s, want the handler's 3s (delayed path bypassed?)", delay)
+				}
+				// Drop stale events left by sibling tests' goroutines, then prove
+				// the restart did not preempt the response just delivered.
+			drain:
+				for {
+					select {
+					case <-restarts:
+					default:
+						break drain
+					}
+				}
 				select {
 				case <-restarts:
 					t.Fatal("panel restarted before response was delivered")
 				default:
 				}
+				// The scheduled goroutine really fires the hook. Generous ceiling:
+				// under -race load a 3s sleep can overshoot by seconds.
 				select {
-				case at := <-restarts:
-					if at.Sub(start) < 3*time.Second {
-						t.Fatalf("restart delay = %s, want >=3s", at.Sub(start))
-					}
-				case <-time.After(6 * time.Second):
+				case <-restarts:
+				case <-time.After(15 * time.Second):
 					t.Fatal("accepted request did not restart panel")
 				}
 			})

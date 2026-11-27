@@ -15,6 +15,7 @@
 package nftables
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -86,22 +87,12 @@ type Service struct{}
 // Host networking defaults
 // ---------------------------------------------------------------------------
 
-// readSysctl reads one sysctl's current value, or "" when it cannot be read (a
-// key this kernel does not have).
-func readSysctl(key string) string {
-	out, err := exec.Command("sysctl", "-n", key).Output()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
-}
-
 // firewalldRunning reports whether firewalld is installed and active.
 func firewalldRunning() bool {
 	if !commandExists("firewall-cmd") {
 		return false
 	}
-	out, _ := exec.Command("firewall-cmd", "--state").CombinedOutput()
+	out, _ := exec.CommandContext(context.Background(), "firewall-cmd", "--state").CombinedOutput()
 	return strings.TrimSpace(string(out)) == "running"
 }
 
@@ -137,7 +128,7 @@ func EnsureVpnHostNetworking() {
 	// rp_filter → loose. `all` is the effective-max override; set `default` too so
 	// PPP/tun interfaces created later inherit loose rather than strict.
 	for _, key := range []string{"net.ipv4.conf.all.rp_filter", "net.ipv4.conf.default.rp_filter"} {
-		_ = exec.Command("sysctl", "-w", key+"=2").Run()
+		_ = exec.CommandContext(context.Background(), "sysctl", "-w", key+"=2").Run()
 	}
 
 	if !firewalldRunning() {
@@ -146,15 +137,15 @@ func EnsureVpnHostNetworking() {
 	// Only add the trusted source when it isn't already there. Add it to both the
 	// runtime and permanent configs so no `firewall-cmd --reload` (which would drop
 	// other runtime-only state) is needed.
-	out, _ := exec.Command("firewall-cmd", "--zone=trusted", "--query-source="+vpnAddrSpace).CombinedOutput()
+	out, _ := exec.CommandContext(context.Background(), "firewall-cmd", "--zone=trusted", "--query-source="+vpnAddrSpace).CombinedOutput()
 	if strings.TrimSpace(string(out)) == "yes" {
 		return
 	}
-	if err := exec.Command("firewall-cmd", "--zone=trusted", "--add-source="+vpnAddrSpace).Run(); err != nil {
+	if err := exec.CommandContext(context.Background(), "firewall-cmd", "--zone=trusted", "--add-source="+vpnAddrSpace).Run(); err != nil {
 		logger.Warningf("firewalld: failed to trust VPN space %s: %v", vpnAddrSpace, err)
 		return
 	}
-	_ = exec.Command("firewall-cmd", "--permanent", "--zone=trusted", "--add-source="+vpnAddrSpace).Run()
+	_ = exec.CommandContext(context.Background(), "firewall-cmd", "--permanent", "--zone=trusted", "--add-source="+vpnAddrSpace).Run()
 	logger.Infof("firewalld: trusted VPN space %s so the TPROXY data plane reaches Xray", vpnAddrSpace)
 }
 
@@ -200,10 +191,9 @@ func WriteClientToClientRules(b *strings.Builder, subnets []string, enabled bool
 			// would also match the server's public address and divert client traffic away
 			// from the TPROXY rules below, changing how every protocol egresses.
 			if !enabled {
-				b.WriteString(fmt.Sprintf(
-					"add rule ip vpn prerouting ip saddr %s ip daddr %s fib daddr type local accept\n", src, dst))
+				fmt.Fprintf(b, "add rule ip vpn prerouting ip saddr %s ip daddr %s fib daddr type local accept\n", src, dst)
 			}
-			b.WriteString(fmt.Sprintf("add rule ip vpn prerouting ip saddr %s ip daddr %s %s\n", src, dst, verdict))
+			fmt.Fprintf(b, "add rule ip vpn prerouting ip saddr %s ip daddr %s %s\n", src, dst, verdict)
 		}
 	}
 }
@@ -230,7 +220,7 @@ func WriteCrossInboundRules(b *strings.Builder, nets []SteeringNet) {
 			}
 			for _, sa := range a.Subnets {
 				for _, dst := range bnet.Subnets {
-					b.WriteString(fmt.Sprintf("add rule ip vpn prerouting ip saddr %s ip daddr %s %s\n", sa, dst, verdict))
+					fmt.Fprintf(b, "add rule ip vpn prerouting ip saddr %s ip daddr %s %s\n", sa, dst, verdict)
 				}
 			}
 		}
@@ -243,8 +233,8 @@ func WriteCrossInboundRules(b *strings.Builder, nets []SteeringNet) {
 // path marks 0xff before re-entering).
 func writeTPROXYRules(b *strings.Builder, srcs []string, port int) {
 	for _, src := range srcs {
-		b.WriteString(fmt.Sprintf("add rule ip vpn prerouting ip saddr %s meta mark != 0xff ip protocol tcp tproxy to :%d meta mark set mark or 0x1 accept\n", src, port))
-		b.WriteString(fmt.Sprintf("add rule ip vpn prerouting ip saddr %s meta mark != 0xff ip protocol udp tproxy to :%d meta mark set mark or 0x1 accept\n", src, port))
+		fmt.Fprintf(b, "add rule ip vpn prerouting ip saddr %s meta mark != 0xff ip protocol tcp tproxy to :%d meta mark set mark or 0x1 accept\n", src, port)
+		fmt.Fprintf(b, "add rule ip vpn prerouting ip saddr %s meta mark != 0xff ip protocol udp tproxy to :%d meta mark set mark or 0x1 accept\n", src, port)
 	}
 }
 
@@ -259,7 +249,8 @@ func writeTPROXYRules(b *strings.Builder, srcs []string, port int) {
 func (s *Service) ApplyNftRules(input RulesInput) error {
 	// If no VPN inbounds at all, remove the table entirely.
 	if len(input.Nets) == 0 {
-		s.runCmd("nft", "delete", "table", "ip", "vpn")
+		// Teardown best-effort: runCmd logs its own failures at debug.
+		_ = s.runCmd("nft", "delete", "table", "ip", "vpn")
 		os.Remove(NftConfigFile)
 		return nil
 	}
@@ -274,8 +265,8 @@ func (s *Service) ApplyNftRules(input RulesInput) error {
 	// Create table and chains (idempotent — 'add' doesn't error if they already exist)
 	b.WriteString("add table ip vpn\n")
 	for _, p := range AcctProtocols {
-		b.WriteString(fmt.Sprintf("add chain ip vpn %s\n", p+"_acct_in"))
-		b.WriteString(fmt.Sprintf("add chain ip vpn %s\n", p+"_acct_out"))
+		fmt.Fprintf(&b, "add chain ip vpn %s\n", p+"_acct_in")
+		fmt.Fprintf(&b, "add chain ip vpn %s\n", p+"_acct_out")
 	}
 	b.WriteString("add chain ip vpn prerouting { type filter hook prerouting priority mangle; policy accept; }\n")
 	b.WriteString("add chain ip vpn postrouting { type filter hook postrouting priority mangle; policy accept; }\n")
@@ -297,10 +288,10 @@ func (s *Service) ApplyNftRules(input RulesInput) error {
 	// protocol are forwarded and were billed at 2x. Splitting by direction is exactly
 	// once under BOTH topologies.
 	for _, p := range AcctProtocols {
-		b.WriteString(fmt.Sprintf("add rule ip vpn prerouting jump %s\n", p+"_acct_in"))
+		fmt.Fprintf(&b, "add rule ip vpn prerouting jump %s\n", p+"_acct_in")
 	}
 	for _, p := range AcctProtocols {
-		b.WriteString(fmt.Sprintf("add rule ip vpn postrouting jump %s\n", p+"_acct_out"))
+		fmt.Fprintf(&b, "add rule ip vpn postrouting jump %s\n", p+"_acct_out")
 	}
 
 	// --- Cross-inbound pass (mutual opt-in) --------------------------------
@@ -323,19 +314,19 @@ func (s *Service) ApplyNftRules(input RulesInput) error {
 	for _, iface := range input.GREIfaces {
 		addrs := input.GREAllowed[iface]
 		if len(addrs) == 0 {
-			b.WriteString(fmt.Sprintf("add rule ip vpn prerouting iifname \"%s\" counter drop comment \"gre-antispoof-all\"\n", iface))
+			fmt.Fprintf(&b, "add rule ip vpn prerouting iifname \"%s\" counter drop comment \"gre-antispoof-all\"\n", iface)
 			continue
 		}
-		b.WriteString(fmt.Sprintf(
+		fmt.Fprintf(&b,
 			"add rule ip vpn prerouting iifname \"%s\" ip saddr != { %s } counter drop comment \"gre-antispoof\"\n",
-			iface, strings.Join(addrs, ", ")))
+			iface, strings.Join(addrs, ", "))
 	}
 	// Hard block for accounts that are disabled, expired or over quota. Every other
 	// protocol enforces this by refusing the handshake; here the account's route and
 	// neighbour entry are withdrawn, but the promiscuous catch-all would still
 	// decapsulate its packets, so the drop has to be explicit.
 	for _, cidr := range input.GREBlocked {
-		b.WriteString(fmt.Sprintf("add rule ip vpn prerouting ip saddr %s counter drop comment \"gre-blocked\"\n", cidr))
+		fmt.Fprintf(&b, "add rule ip vpn prerouting ip saddr %s counter drop comment \"gre-blocked\"\n", cidr)
 	}
 
 	// --- Per-inbound client-to-client gate + TPROXY steering ---------------
@@ -365,16 +356,16 @@ func (s *Service) ApplyNftRules(input RulesInput) error {
 	// Best-effort: drop the legacy OpenVPN NAT chain left by older versions that
 	// masqueraded OpenVPN straight to the internet. OpenVPN now routes via TPROXY,
 	// so the chain is obsolete. Both calls no-op once it's gone.
-	s.runCmd("nft", "flush", "chain", "ip", "vpn", "nat_post")
-	s.runCmd("nft", "delete", "chain", "ip", "vpn", "nat_post")
+	_ = s.runCmd("nft", "flush", "chain", "ip", "vpn", "nat_post")
+	_ = s.runCmd("nft", "delete", "chain", "ip", "vpn", "nat_post")
 
 	// Best-effort: drop the pre-split combined "<proto>_acct" chains. The static chains
 	// were rebuilt above without their jumps, so on an upgraded box they linger holding
 	// dead rules that nothing reaches. AddClientAccounting repopulates the new direction
 	// chains on the next reconcile tick. Both calls no-op once they're gone.
 	for _, p := range AcctProtocols {
-		s.runCmd("nft", "flush", "chain", "ip", "vpn", p+"_acct")
-		s.runCmd("nft", "delete", "chain", "ip", "vpn", p+"_acct")
+		_ = s.runCmd("nft", "flush", "chain", "ip", "vpn", p+"_acct")
+		_ = s.runCmd("nft", "delete", "chain", "ip", "vpn", p+"_acct")
 	}
 
 	logger.Infof("nft: loaded VPN rules (%d steering nets)", len(input.Nets))
@@ -443,27 +434,29 @@ func MergeGreViews(views []GreView) (ifaces []string, allowed map[string][]strin
 // boxes upgraded from the pre-nftables vpn-ui; the protocol wave can re-add the
 // per-inbound sweep when it lands. The chain deletions below cover the rest.
 func (s *Service) CleanupLegacyIptables() {
+	// Best-effort sweep: every command targets a rule/chain that may already be
+	// gone (the whole point of the cleanup), and runCmd logs its own failures.
 	// Remove L2TP_ACCT chain
-	s.runCmd("iptables", "-t", "mangle", "-D", "PREROUTING", "-j", "L2TP_ACCT")
-	s.runCmd("iptables", "-t", "mangle", "-D", "POSTROUTING", "-j", "L2TP_ACCT")
-	s.runCmd("iptables", "-t", "mangle", "-F", "L2TP_ACCT")
-	s.runCmd("iptables", "-t", "mangle", "-X", "L2TP_ACCT")
+	_ = s.runCmd("iptables", "-t", "mangle", "-D", "PREROUTING", "-j", "L2TP_ACCT")
+	_ = s.runCmd("iptables", "-t", "mangle", "-D", "POSTROUTING", "-j", "L2TP_ACCT")
+	_ = s.runCmd("iptables", "-t", "mangle", "-F", "L2TP_ACCT")
+	_ = s.runCmd("iptables", "-t", "mangle", "-X", "L2TP_ACCT")
 
 	// Remove PPTP_ACCT chain
-	s.runCmd("iptables", "-t", "mangle", "-D", "PREROUTING", "-j", "PPTP_ACCT")
-	s.runCmd("iptables", "-t", "mangle", "-D", "POSTROUTING", "-j", "PPTP_ACCT")
-	s.runCmd("iptables", "-t", "mangle", "-F", "PPTP_ACCT")
-	s.runCmd("iptables", "-t", "mangle", "-X", "PPTP_ACCT")
+	_ = s.runCmd("iptables", "-t", "mangle", "-D", "PREROUTING", "-j", "PPTP_ACCT")
+	_ = s.runCmd("iptables", "-t", "mangle", "-D", "POSTROUTING", "-j", "PPTP_ACCT")
+	_ = s.runCmd("iptables", "-t", "mangle", "-F", "PPTP_ACCT")
+	_ = s.runCmd("iptables", "-t", "mangle", "-X", "PPTP_ACCT")
 
 	// Remove old raw L2TP filter
-	s.runCmd("iptables", "-D", "INPUT", "-p", "udp", "--dport", "1701",
+	_ = s.runCmd("iptables", "-D", "INPUT", "-p", "udp", "--dport", "1701",
 		"-m", "policy", "--dir", "in", "--pol", "none", "-j", "DROP")
 
 	logger.Info("nft: cleaned up legacy iptables rules")
 }
 
 func (s *Service) runCmd(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
+	cmd := exec.CommandContext(context.Background(), name, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		logger.Debugf("nft: cmd '%s %s' failed: %s %v", name, strings.Join(args, " "), string(output), err)

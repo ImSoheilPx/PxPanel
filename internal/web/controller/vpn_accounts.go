@@ -29,16 +29,13 @@ import (
 )
 
 // shared singletons, the way the source's permission.go kept its package-level
-// services: every service here is stateless.
+// services: every service here is stateless. The reseller half of the source's
+// ResellerService is package functions here (BalanceFor/OwnedEmails/UsageOf), so
+// no adapter is needed.
 var (
-	vpnAccountService  accounts.AccountService
-	vpnResellerService = &resellerViewAdapter{}
-	vpnHooksService    = &vpnHooks{}
+	vpnAccountService accounts.AccountService
+	vpnHooksService   = &vpnHooks{}
 )
-
-// resellerViewAdapter carries the pieces of vpn-ui's ResellerService the inbound
-// controller used (BalanceFor/OwnedEmails/UsageOf are package functions here).
-type resellerViewAdapter struct{}
 
 // VpnAccountsController registers the account-plane routes.
 type VpnAccountsController struct {
@@ -325,7 +322,7 @@ func (a *VpnAccountsController) bulkMembership(c *gin.Context) {
 			skip(fmt.Sprintf("%s: no such account", email))
 			continue
 		}
-		wanted := current
+		var wanted []int
 		if adding {
 			wanted = unionInboundIds(current, chosen)
 		} else {

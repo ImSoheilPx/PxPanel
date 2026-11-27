@@ -5,6 +5,7 @@
 package ssh
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -180,7 +181,8 @@ func (m *sshManager) startServer(svc *SshService, inbound *model.Inbound) (*sshS
 	cfg.AddHostKey(signer)
 	srv.cfg = cfg
 
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", inbound.Port))
+	var lc net.ListenConfig
+	ln, err := lc.Listen(context.Background(), "tcp", fmt.Sprintf(":%d", inbound.Port))
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +263,8 @@ func (m *sshManager) handleConn(srv *sshServer, nConn net.Conn) {
 
 	for nc := range chans {
 		if nc.ChannelType() != "direct-tcpip" {
-			nc.Reject(ssh.Prohibited, "only direct-tcpip is permitted")
+			// Reject is best-effort: a dead transport has the same effect.
+			_ = nc.Reject(ssh.Prohibited, "only direct-tcpip is permitted")
 			continue
 		}
 		go m.handleDirectTCPIP(srv, sess, nc)
@@ -322,7 +325,7 @@ func sshReadUint32(b []byte) (uint32, []byte, bool) {
 func (m *sshManager) handleDirectTCPIP(srv *sshServer, sess *sshSession, nc ssh.NewChannel) {
 	d, ok := parseDirectTCPIP(nc.ExtraData())
 	if !ok {
-		nc.Reject(ssh.ConnectionFailed, "bad direct-tcpip request")
+		_ = nc.Reject(ssh.ConnectionFailed, "bad direct-tcpip request")
 		return
 	}
 
@@ -340,7 +343,7 @@ func (m *sshManager) handleDirectTCPIP(srv *sshServer, sess *sshSession, nc ssh.
 
 	upstream, err := dialSocksConnect(srv.socksPort, sess.email, d.destHost, int(d.destPort))
 	if err != nil {
-		nc.Reject(ssh.ConnectionFailed, "upstream dial failed")
+		_ = nc.Reject(ssh.ConnectionFailed, "upstream dial failed")
 		return
 	}
 	ch, chReqs, err := nc.Accept()
@@ -355,13 +358,15 @@ func (m *sshManager) handleDirectTCPIP(srv *sshServer, sess *sshSession, nc ssh.
 	go func() {
 		copyCount(upstream, ch, &sess.acct.up)
 		if hc, ok := upstream.(interface{ CloseWrite() error }); ok {
-			hc.CloseWrite()
+			// Half-close is a courtesy signal; the full Close below is the one
+			// that matters, so a failed CloseWrite is ignored.
+			_ = hc.CloseWrite()
 		}
 		done <- struct{}{}
 	}()
 	go func() {
 		copyCount(ch, upstream, &sess.acct.down)
-		ch.CloseWrite()
+		_ = ch.CloseWrite()
 		done <- struct{}{}
 	}()
 	<-done

@@ -174,7 +174,7 @@ func writeCharonConf() error {
 	if err != nil {
 		return err
 	}
-	_ = os.MkdirAll(ikev2ConfigRoot, 0755)
+	_ = os.MkdirAll(ikev2ConfigRoot, 0o755)
 
 	// Both of these belong to a host strongSwan when there is one, and both are
 	// replaced outright: strongswan.conf with our whole render, swanctl.conf with a
@@ -183,18 +183,18 @@ func writeCharonConf() error {
 	// them; see ownership.go.
 	manifest.PrepareHostFile("/etc/strongswan.conf", "ikev2")
 	if err := os.WriteFile("/etc/strongswan.conf",
-		[]byte(configedit.ApplyOverride("ipsec", 0, "strongswan.conf", body)), 0600); err != nil {
+		[]byte(configedit.ApplyOverride("ipsec", 0, "strongswan.conf", body)), 0o600); err != nil {
 		return fmt.Errorf("write /etc/strongswan.conf: %w", err)
 	}
 
 	// swanctl.conf just pulls in the per-protocol connection files, so it carries no
 	// operator-visible settings of its own and is not offered in the config editor.
-	_ = os.MkdirAll(swanctlConfDir, 0755)
-	_ = os.MkdirAll(swanctlX509, 0755)
-	_ = os.MkdirAll(swanctlX509CA, 0755)
-	_ = os.MkdirAll(swanctlPrivate, 0700)
+	_ = os.MkdirAll(swanctlConfDir, 0o755)
+	_ = os.MkdirAll(swanctlX509, 0o755)
+	_ = os.MkdirAll(swanctlX509CA, 0o755)
+	_ = os.MkdirAll(swanctlPrivate, 0o700)
 	manifest.PrepareHostFile(swanctlDir+"/swanctl.conf", "ikev2")
-	return os.WriteFile(swanctlDir+"/swanctl.conf", []byte("include conf.d/*.conf\n"), 0600)
+	return os.WriteFile(swanctlDir+"/swanctl.conf", []byte("include conf.d/*.conf\n"), 0o600)
 }
 
 // buildCharonConf renders the strongswan.conf body. Split from the write so the config
@@ -225,14 +225,14 @@ func buildCharonConf() (string, error) {
 	b.WriteString("        }\n")
 	b.WriteString("    }\n")
 	b.WriteString("    plugins {\n")
-	b.WriteString(fmt.Sprintf("        include %s/charon/*.conf\n", procmgr.Bundles().StrongswanDefaultConfDir()))
+	fmt.Fprintf(&b, "        include %s/charon/*.conf\n", procmgr.Bundles().StrongswanDefaultConfDir())
 	b.WriteString("        eap-radius {\n")
 	b.WriteString("            accounting = yes\n")
 	b.WriteString("            accounting_interval = 300\n")
 	b.WriteString("            servers {\n")
 	b.WriteString("                pxpanel {\n")
 	b.WriteString("                    address = 127.0.0.1\n")
-	b.WriteString(fmt.Sprintf("                    secret = %s\n", radiusSecret))
+	fmt.Fprintf(&b, "                    secret = %s\n", radiusSecret)
 	b.WriteString("                    auth_port = 1812\n")
 	b.WriteString("                    acct_port = 1813\n")
 	b.WriteString("                    nas_identifier = ikev2\n")
@@ -240,7 +240,7 @@ func buildCharonConf() (string, error) {
 	b.WriteString("            }\n")
 	b.WriteString("        }\n")
 	b.WriteString("        attr {\n")
-	b.WriteString(fmt.Sprintf("            dns = %s, %s\n", dns1, dns2))
+	fmt.Fprintf(&b, "            dns = %s, %s\n", dns1, dns2)
 	b.WriteString("        }\n")
 	b.WriteString("    }\n")
 	b.WriteString("}\n")
@@ -263,7 +263,7 @@ func ensureCharonRunning() error {
 		log.Warning("charon: link strongswan ipsec dir:", err)
 	}
 	if !procmgr.GetProcManager().IsRunning(ikev2ProcName) {
-		_ = os.MkdirAll("/var/run", 0755)
+		_ = os.MkdirAll("/var/run", 0o755)
 		if err := procmgr.GetProcManager().Start(ikev2ProcName, charonBin(), nil, nil, ikev2ConfigRoot); err != nil {
 			return fmt.Errorf("start charon: %w", err)
 		}

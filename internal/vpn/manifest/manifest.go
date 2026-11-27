@@ -82,18 +82,6 @@ const (
 	ownFouPort = "fouport" // a FOU (UDP-encapsulation) receive port we registered
 	ownSysctl  = "sysctl"  // a sysctl whose value we changed
 	ownEthtool = "ethtool" // an ethtool offload setting we turned off
-
-	// ownIpRule is RESERVED, not yet recorded anywhere, and the reason is worth
-	// stating so nobody records it half way. The `fwmark 1 lookup 100` policy route
-	// is added by SIX SetupRouting functions, each with its own copy of the same
-	// "add it unless `ip rule show` already mentions it" guard. Recording it from
-	// only some of them is WORSE than not recording it: whichever protocol runs
-	// second sees the rule already present and would write down "the operator had
-	// this", which is exactly backwards. It needs one shared ensureVpnPolicyRoute
-	// helper first; until then the whole-host uninstall keeps deleting the rule
-	// unconditionally, which is the safe direction (a stray fwmark rule with a
-	// flushed table 100 blackholes traffic).
-	ownIpRule = "iprule"
 )
 
 // ownState is the tri-state answer to "was this here before pxpanel?".
@@ -219,7 +207,7 @@ func ownSaveLocked() {
 		return
 	}
 	dir := filepath.Dir(ownershipFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		log.Warning("ownership: could not create", dir, err)
 		return
 	}
@@ -227,7 +215,7 @@ func ownSaveLocked() {
 	// truncated manifest, which would read back as "nothing is ours" and quietly
 	// disable every cleanup path.
 	tmp := ownershipFile + ".tmp"
-	if err := os.WriteFile(tmp, data, 0644); err != nil {
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
 		log.Warning("ownership: could not write the manifest:", err)
 		return
 	}
@@ -582,13 +570,13 @@ func ownBackupFile(path string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	if err := os.MkdirAll(ownershipBackupDir, 0700); err != nil {
+	if err := os.MkdirAll(ownershipBackupDir, 0o700); err != nil {
 		return "", "", err
 	}
 	dest := filepath.Join(ownershipBackupDir, ownBackupName(path))
 	// The original mode is preserved so restoring /etc/ipsec.secrets does not
 	// hand a host's PSK file back world-readable.
-	mode := os.FileMode(0600)
+	mode := os.FileMode(0o600)
 	if st, err := os.Stat(path); err == nil {
 		mode = st.Mode().Perm()
 	}
@@ -714,7 +702,7 @@ func RestoreFile(path, backup string) bool {
 		log.Warning("ownership: backup", backup, "is gone, leaving", path, "as it is:", err)
 		return false
 	}
-	mode := os.FileMode(0600)
+	mode := os.FileMode(0o600)
 	if st, err := os.Stat(backup); err == nil {
 		mode = st.Mode().Perm()
 	}

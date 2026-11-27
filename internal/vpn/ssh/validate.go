@@ -192,15 +192,3 @@ func optInt(m map[string]any, key string) (int, bool, error) {
 	}
 	return int(f), true, nil
 }
-
-func optBool(m map[string]any, key string) (bool, bool, error) {
-	v, ok := m[key]
-	if !ok || v == nil {
-		return false, false, nil
-	}
-	b, ok := v.(bool)
-	if !ok {
-		return false, false, common.NewErrorf("%q must be true or false", key)
-	}
-	return b, true, nil
-}

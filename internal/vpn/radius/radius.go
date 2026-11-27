@@ -205,11 +205,13 @@ func (s *RadiusService) Stop() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if s.authServer != nil {
-		s.authServer.Shutdown(ctx)
+		// Teardown best-effort: a timed-out shutdown leaves the listener to the
+		// process exit that always follows Stop.
+		_ = s.authServer.Shutdown(ctx)
 		s.authServer = nil
 	}
 	if s.acctServer != nil {
-		s.acctServer.Shutdown(ctx)
+		_ = s.acctServer.Shutdown(ctx)
 		s.acctServer = nil
 	}
 }
@@ -261,7 +263,9 @@ func (s *RadiusService) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 
 	if username == "" || nasID == "" {
 		logger.Debug("RADIUS: auth rejected — missing username or NAS-Identifier")
-		w.Write(r.Response(radius.CodeAccessReject))
+		// Reply writes are best-effort: the client retransmits if the datagram is
+		// lost, and there is nothing to recover on a failed send.
+		_ = w.Write(r.Response(radius.CodeAccessReject))
 		return
 	}
 
@@ -269,7 +273,7 @@ func (s *RadiusService) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 	protocol, inboundId, err := parseNASIdentifier(nasID)
 	if err != nil {
 		logger.Infof("RADIUS: auth rejected — invalid NAS-Identifier %q", nasID)
-		w.Write(r.Response(radius.CodeAccessReject))
+		_ = w.Write(r.Response(radius.CodeAccessReject))
 		return
 	}
 
@@ -285,7 +289,7 @@ func (s *RadiusService) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 	password, err := s.lookupClient(protocol, inboundId, username)
 	if err != nil {
 		logger.Infof("RADIUS: auth rejected — %s user=%s nas=%s", err, username, nasID)
-		w.Write(r.Response(radius.CodeAccessReject))
+		_ = w.Write(r.Response(radius.CodeAccessReject))
 		return
 	}
 
@@ -327,7 +331,7 @@ func (s *RadiusService) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 				w.Write(r.Response(radius.CodeAccessReject))
 				return
 			}
-			rfc2865.FramedIPAddress_Set(accept, clientIP)
+			_ = rfc2865.FramedIPAddress_Set(accept, clientIP)
 			// The session was recorded at auth (getClientIP -> allocateBlockIP). ocserv
 			// won't drive Acct-Start usefully, so create the nft accounting counters here
 			// too, off the lock, otherwise this device's traffic is never counted and
@@ -337,7 +341,7 @@ func (s *RadiusService) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 			}
 			// Interim accounting is not billing here (nft counters do that): it is the only
 			// liveness signal ocserv gives the panel, see handleOcservAcct.
-			rfc2869.AcctInterimInterval_Set(accept, rfc2869.AcctInterimInterval(ocInterimInterval))
+			_ = rfc2869.AcctInterimInterval_Set(accept, rfc2869.AcctInterimInterval(ocInterimInterval))
 			logger.Infof("RADIUS: auth accepted (PAP) user=%s nas=%s ip=%v", username, nasID, clientIP)
 		} else {
 			logger.Infof("RADIUS: auth accepted (PAP) user=%s nas=%s", username, nasID)
@@ -379,18 +383,20 @@ func (s *RadiusService) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 	success := make([]byte, 43)
 	success[0] = ident
 	copy(success[1:], authResp)
-	microsoft.MSCHAP2Success_Add(accept, success)
+	// Attribute setters below can only fail on an over-long value; every value
+	// here is fixed-size, and the Accept carrying them is best-effort anyway.
+	_ = microsoft.MSCHAP2Success_Add(accept, success)
 
 	// MPPE keys (required for PPTP, harmlessly ignored by L2TP)
 	recvKey, _ := rfc3079.MakeKey(ntResponse, []byte(password), false)
 	sendKey, _ := rfc3079.MakeKey(ntResponse, []byte(password), true)
-	microsoft.MSMPPERecvKey_Add(accept, recvKey)
-	microsoft.MSMPPESendKey_Add(accept, sendKey)
-	microsoft.MSMPPEEncryptionPolicy_Add(accept, microsoft.MSMPPEEncryptionPolicy_Value_EncryptionRequired)
+	_ = microsoft.MSMPPERecvKey_Add(accept, recvKey)
+	_ = microsoft.MSMPPESendKey_Add(accept, sendKey)
+	_ = microsoft.MSMPPEEncryptionPolicy_Add(accept, microsoft.MSMPPEEncryptionPolicy_Value_EncryptionRequired)
 	// 128-bit only: with "40or128 allowed" the server pppd settles on weak 40-bit
 	// MPPE (offers +L -S), which 128-bit-requiring clients (Windows/NM default)
 	// reject with "MPPE required but peer negotiation failed".
-	microsoft.MSMPPEEncryptionTypes_Add(accept, microsoft.MSMPPEEncryptionTypes_Value_RC4128bitAllowed)
+	_ = microsoft.MSMPPEEncryptionTypes_Add(accept, microsoft.MSMPPEEncryptionTypes_Value_RC4128bitAllowed)
 
 	// Assign deterministic IP so per-user Xray routing works via source IP. A deny
 	// means the account is at its User Limit and the strategy is "reject".
@@ -401,11 +407,11 @@ func (s *RadiusService) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 		return
 	}
 	if clientIP != nil {
-		rfc2865.FramedIPAddress_Set(accept, clientIP)
+		_ = rfc2865.FramedIPAddress_Set(accept, clientIP)
 	}
 
 	// Request periodic accounting updates (60s minimum for pppd)
-	rfc2869.AcctInterimInterval_Set(accept, rfc2869.AcctInterimInterval(60))
+	_ = rfc2869.AcctInterimInterval_Set(accept, rfc2869.AcctInterimInterval(60))
 
 	logger.Infof("RADIUS: auth accepted user=%s nas=%s ip=%v", username, nasID, clientIP)
 	w.Write(accept)
@@ -542,7 +548,9 @@ func (s *RadiusService) handleAcct(w radius.ResponseWriter, r *radius.Request) {
 			// Unknown session (e.g. after panel restart) — try cleanup by IP if available
 			ip := framedIP.String()
 			if ip != "<nil>" && ip != "" {
-				s.nft.RemoveClientAccounting(protocol, ip)
+				// Best-effort cleanup of a session this process never saw; the
+				// nft counters are deleted on the next reconcile regardless.
+				_ = s.nft.RemoveClientAccounting(protocol, ip)
 				logger.Infof("RADIUS: acct-stop (orphan) user=%s ip=%s proto=%s session=%s", username, ip, protocol, sessionID)
 			} else {
 				logger.Debugf("RADIUS: acct-stop unknown session=%s user=%s", sessionID, username)
@@ -572,7 +580,9 @@ func (s *RadiusService) handleAcct(w radius.ResponseWriter, r *radius.Request) {
 						started:   time.Now(),
 					}
 					s.mu.Unlock()
-					s.nft.AddClientAccounting(protocol, ip)
+					// Best-effort: the counters are recreated on the next auth if
+					// this add fails, and the interim reply is what matters here.
+					_ = s.nft.AddClientAccounting(protocol, ip)
 					logger.Infof("RADIUS: re-added session from interim user=%s email=%s ip=%s", username, email, ip)
 					return
 				}
@@ -991,7 +1001,9 @@ func (s *RadiusService) killPppdByIP(ip string) {
 		}
 		pid := strings.TrimSpace(string(pidData))
 		if pid != "" {
-			exec.Command("kill", pid).Run()
+			// Best-effort kill: the session is already gone from the panel's view,
+			// and pppd exiting on its own is the same end state.
+			_ = exec.Command("kill", pid).Run()
 			logger.Infof("RADIUS: killed pppd pid=%s iface=%s ip=%s", pid, iface, ip)
 		}
 	}
@@ -1030,7 +1042,9 @@ func (s *RadiusService) CleanStaleSessions() {
 		// session that did not report a stop) silently drops its last window of traffic.
 		up, down := s.nft.ReadAndResetClientCounters(sess.protocol, sess.ip)
 		vpn.TrafficSinkFor().FoldClientTraffic(sess.email, sess.protocol, sess.inboundId, up, down)
-		s.nft.RemoveClientAccounting(sess.protocol, sess.ip)
+		// Best-effort: the session is already deleted above, so a failed counter
+		// teardown only leaves a zeroed set to be reclaimed later.
+		_ = s.nft.RemoveClientAccounting(sess.protocol, sess.ip)
 		logger.Infof("RADIUS: cleaned stale session=%s email=%s ip=%s", sid, sess.email, sess.ip)
 		s.mu.Lock()
 	}

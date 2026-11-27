@@ -1,6 +1,7 @@
 package vpnout
 
 import (
+	"context"
 	"fmt"
 	"hash/fnv"
 	"net"
@@ -409,12 +410,12 @@ func greOutResolve(host string) (net.IP, error) {
 		}
 		return nil, fmt.Errorf("remote %q is IPv6; this driver builds IPv4 GRE tunnels", host)
 	}
-	ips, err := net.LookupIP(host)
+	ips, err := net.DefaultResolver.LookupIPAddr(context.Background(), host)
 	if err != nil {
 		return nil, fmt.Errorf("cannot resolve remote %q: %w", host, err)
 	}
 	for _, ip := range ips {
-		if v4 := ip.To4(); v4 != nil {
+		if v4 := ip.IP.To4(); v4 != nil {
 			return v4, nil
 		}
 	}
@@ -518,9 +519,11 @@ func (greOutDriver) Up(cfg VpnOutboundConfig) (string, error) {
 
 	// ip_gre is loaded before any LinkAdd, and fou before any encap device: a FOU LinkAdd
 	// against an unloaded module fails EINVAL rather than degrading to plain GRE.
-	gre.runCmd("modprobe", greModule)
+	// Best-effort preloads: built-in kernels have nothing to load, and the LinkAdd
+	// below is what reports a genuinely unavailable module.
+	_ = gre.runCmd("modprobe", greModule)
 	if st.FouEnable {
-		gre.runCmd("modprobe", greFouModule)
+		_ = gre.runCmd("modprobe", greFouModule)
 		if err := greOutEnsureFou(cfg.Tag, st.greOutFouPort()); err != nil {
 			return "", err
 		}

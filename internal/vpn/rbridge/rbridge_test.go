@@ -57,12 +57,14 @@ func (f *fakeAdapter) Protocol() string { return f.proto }
 func (f *fakeAdapter) Poll() ([]Live, error) {
 	return f.live, nil
 }
+
 func (f *fakeAdapter) Limit(inboundID int) (int, string) {
 	if f.strategy == "" {
 		f.strategy = "reject"
 	}
 	return f.limits[inboundID], f.strategy
 }
+
 func (f *fakeAdapter) Evict(l Live) error {
 	f.evicted = append(f.evicted, l.IP)
 	return nil
@@ -78,6 +80,7 @@ func (f *fakeSink) ReconcileLocalSessions(proto string, desired map[string]Recon
 	}
 	f.reconciled[proto] = desired
 }
+
 func (f *fakeSink) DisabledEmails() map[string]bool {
 	return map[string]bool{"dead@x": true}
 }

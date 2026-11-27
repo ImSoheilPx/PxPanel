@@ -107,9 +107,12 @@ func Auth() {
 
 	// Send PAP Access-Request
 	packet := radius.New(radius.CodeAccessRequest, []byte(secret))
-	rfc2865.UserName_SetString(packet, username)
-	rfc2865.UserPassword_SetString(packet, password)
-	rfc2865.NASIdentifier_SetString(packet, fmt.Sprintf("openvpn-%d", inboundId))
+	// Attribute setters can only fail on an over-long (>253-byte) value; these
+	// three are the hook's own short arguments, and the exchange below is what
+	// reports a request the server rejected.
+	_ = rfc2865.UserName_SetString(packet, username)
+	_ = rfc2865.UserPassword_SetString(packet, password)
+	_ = rfc2865.NASIdentifier_SetString(packet, fmt.Sprintf("openvpn-%d", inboundId))
 
 	resp, err := radius.Exchange(context.Background(), packet, "127.0.0.1:1812")
 	if err != nil {
@@ -267,7 +270,8 @@ func Evict() {
 	time.Sleep(1500 * time.Millisecond) // let the connect hook return first
 
 	sock := fmt.Sprintf("/var/run/openvpn/mgmt-%d-%s.sock", inboundId, proto)
-	conn, err := net.Dial("unix", sock)
+	var dialer net.Dialer
+	conn, err := dialer.DialContext(context.Background(), "unix", sock)
 	if err != nil {
 		return
 	}

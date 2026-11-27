@@ -16,6 +16,7 @@ package ipsec
 // through procmgr.Bundles() — see the package comment.)
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -33,24 +34,6 @@ import (
 // ipsecCmd()/StartBundledPluto().
 func UsingBundledIpsec() bool {
 	return procmgr.Bundles().UsingBundledIpsec()
-}
-
-// ipsecAvailable reports whether an `ipsec`/libreswan is usable at all — our
-// bundle, or a host install. Replaces the bare commandExists("ipsec") guards,
-// which miss the bundle (whose ipsec lives at a fixed path, not on $PATH).
-func ipsecAvailable() bool {
-	return UsingBundledIpsec() || commandExists("ipsec")
-}
-
-// ipsecCmd is the `ipsec` command the panel shells out to (for --version,
-// checknss, pluto --selftest, auto --add): the bundled wrapper when we ship our
-// own libreswan, else the host's ipsec on PATH.
-func ipsecCmd() string {
-	if UsingBundledIpsec() {
-		_ = EnsureIpsecExtracted()
-		return bundledIpsecPath()
-	}
-	return "ipsec"
 }
 
 // bundledIpsecPath is the bundled `ipsec` launcher (vpn-ui backend.IpsecBundled:
@@ -126,12 +109,15 @@ func EnsureIpsecNssDir() {
 // the generated /etc/ipsec.conf to exist first.
 func EnsureBundledLibreswan() pkgmgr.ProvisionStep {
 	if err := EnsureIpsecExtracted(); err != nil {
-		return pkgmgr.ProvisionStep{Name: "libreswan (bundled IPsec)", OK: false,
-			Msg: "failed to extract the bundled libreswan: " + err.Error()}
+		return pkgmgr.ProvisionStep{
+			Name: "libreswan (bundled IPsec)",
+			OK:   false,
+			Msg:  "failed to extract the bundled libreswan: " + err.Error(),
+		}
 	}
 	EnsureIpsecNssDir()
 	var logb strings.Builder
-	out, err := exec.Command(bundledIpsecPath(), "checknss").CombinedOutput()
+	out, err := exec.CommandContext(context.Background(), bundledIpsecPath(), "checknss").CombinedOutput()
 	logb.WriteString(string(out))
 	if err != nil {
 		return pkgmgr.ProvisionStep{Name: "libreswan (bundled IPsec)", OK: true, Warn: true,
@@ -160,7 +146,7 @@ func StartBundledPluto() error {
 	// the dir itself, so make sure it exists first (else pluto crash-loops on a
 	// bad db).
 	EnsureIpsecNssDir()
-	if out, err := exec.Command(bundledIpsecPath(), "checknss").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(context.Background(), bundledIpsecPath(), "checknss").CombinedOutput(); err != nil {
 		log.Warning("bundled ipsec checknss:", err, strings.TrimSpace(string(out)))
 	}
 	_ = os.MkdirAll("/run/pluto", 0o755)
@@ -182,7 +168,7 @@ func StartBundledPluto() error {
 		// loaded too.
 		conf, _ := os.ReadFile("/etc/ipsec.conf")
 		for _, name := range ipsecConnNames(string(conf)) {
-			if out, err := exec.Command(bundledIpsecPath(), "auto", "--add", name).CombinedOutput(); err != nil {
+			if out, err := exec.CommandContext(context.Background(), bundledIpsecPath(), "auto", "--add", name).CombinedOutput(); err != nil {
 				log.Warning("bundled ipsec auto --add", name+":", err, strings.TrimSpace(string(out)))
 			}
 		}
@@ -241,11 +227,4 @@ func WaitForPath(path string, timeout time.Duration) bool {
 		}
 		time.Sleep(150 * time.Millisecond)
 	}
-}
-
-// commandExists reports whether name resolves on PATH.
-// (vpn-ui core.go:commandExists — folded in; pkgmgr keeps its own.)
-func commandExists(name string) bool {
-	_, err := exec.LookPath(name)
-	return err == nil
 }

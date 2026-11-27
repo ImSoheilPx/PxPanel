@@ -242,13 +242,6 @@ func defaultRange(subnet string) string {
 	return fmt.Sprintf("%s.2-%s.254", subnet, subnet)
 }
 
-// vpnRangeView is a partial view of an inbound's Settings JSON for range math.
-type vpnRangeView struct {
-	IpRanges []string          `json:"ipRanges"`
-	IpRange  string            `json:"ipRange"` // legacy single-range field
-	Clients  []json.RawMessage `json:"clients"`
-}
-
 // decodeRanges returns the explicit ranges from a settings map (ipRanges, or the
 // legacy ipRange seeded as a single-element list). Empty means "unassigned".
 func decodeRanges(raw map[string]json.RawMessage) []string {

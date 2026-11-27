@@ -149,33 +149,6 @@ func ValidateVpnUsername(username string) error {
 	return nil
 }
 
-// validateClientIdentities enforces the three checks above over a whole posted
-// client list. This is the ONLY thing that makes them real: they are pure
-// functions, so a path that does not call this does not validate.
-//
-// Called from all four write paths (add inbound, update inbound, add client,
-// update client) rather than from one of them, because each is separately
-// reachable from the HTTP API and any one left out is a hole through which the
-// whole class walks in.
-//
-// Deliberately NOT called from the delete paths. An account that predates these
-// checks and violates one has to remain deletable, or the only way to clean it up
-// would be editing the database by hand.
-//
-// The VPN username is only checked for the protocols that actually key on it.
-// wg-c, awg, gre and mtproto store id=email (nothing reads it) and the Xray-native
-// protocols store a uuid or a password there, so applying the filename and
-// whitespace rules to those would reject values that are correct.
-func validateClientIdentities(protocol model.Protocol, clients []model.Client) error {
-	return validateChangedClientIdentities(protocol, clients, nil)
-}
-
-// clientIdentityTuple is the exact triple these rules judge. Two clients with the
-// same tuple are indistinguishable to every check below.
-func clientIdentityTuple(c *model.Client) string {
-	return c.Email + "\x00" + c.SubID + "\x00" + c.ID + "\x00" + c.Password
-}
-
 // ValidateShadowsocksKeys refuses a password a 2022-blake3 cipher cannot use.
 //
 // This family is the one protocol whose password is not free text: the user PSK must
@@ -228,73 +201,6 @@ func ValidateShadowsocksKeys(inbound *model.Inbound, clients []model.Client, sto
 		}
 	}
 	return nil
-}
-
-// validateChangedClientIdentities is validateClientIdentities with an exemption
-// for entries that are byte-identical to one already stored.
-//
-// This is what makes the rules safe to switch on over live data, and it is the
-// difference between "enforced on writes" and "enforced retroactively".
-//
-// The whole-inbound save posts EVERY client on the inbound, not just the edited
-// one. Without the exemption, a single account created years ago with a space in
-// its VPN username would fail validation on every subsequent save, so the
-// operator could not change the inbound's DNS, rename it, or add an unrelated
-// account until they first went and fixed that one row. On a panel with hundreds
-// of sold accounts that is an upgrade that bricks an inbound, which is a worse
-// outcome than the hole the rules close.
-//
-// Exempting on the exact tuple rather than per field is deliberate: the moment
-// any part of an account's identity is touched, the whole tuple is new and is
-// held to the current rules. So a bad value can be kept but never edited into a
-// different bad value, and it still cannot be created.
-func validateChangedClientIdentities(protocol model.Protocol, clients []model.Client, stored []model.Client) error {
-	unchanged := make(map[string]struct{}, len(stored))
-	for i := range stored {
-		unchanged[clientIdentityTuple(&stored[i])] = struct{}{}
-	}
-
-	for i := range clients {
-		client := &clients[i]
-		if _, exempt := unchanged[clientIdentityTuple(client)]; exempt {
-			continue
-		}
-		if err := ValidateClientEmail(client.Email); err != nil {
-			return err
-		}
-		if err := ValidateClientSubID(client.SubID); err != nil {
-			return err
-		}
-		if isCredentialVPNProtocol(protocol) {
-			if err := ValidateVpnUsername(client.ID); err != nil {
-				return err
-			}
-		}
-		// The vpn-ui tree ALSO validated a carried "vpnUsername" key here: its
-		// Clients form posted every credential column of an account to whichever
-		// inbound the write was addressed to, so a login name could ride on a vless
-		// entry. pxpanel's model.Client carries no such column yet, so there is
-		// nothing to judge — the check returns with the protocol-keyed one above.
-		//
-		// TODO(accounts wave): if the Clients form starts carrying vpnUsername on
-		// pxpanel's client shape, validate it here unconditionally on protocol.
-	}
-	return nil
-}
-
-// credentialVPNProtocols lists the protocols whose client "id" is a login name.
-// (The vpn-ui switch wrote the seven literals inline; a table keeps the same
-// membership without re-importing a second protocol-constant set here.)
-var credentialVPNProtocols = []model.Protocol{"l2tp", "pptp", "openvpn", "openconnect", "sstp", "ikev2", "ssh"}
-
-// isCredentialVPNProtocol reports whether protocol's client "id" is a login name.
-func isCredentialVPNProtocol(p model.Protocol) bool {
-	for _, c := range credentialVPNProtocols {
-		if c == p {
-			return true
-		}
-	}
-	return false
 }
 
 // -----------------------------------------------------------------------------
@@ -361,7 +267,7 @@ func (s *AccountService) GetAccountByEmailTx(tx *gorm.DB, email string) (*model.
 	var account model.Account
 	err := tx.Where("LOWER(TRIM(email)) = ?", key).First(&account).Error
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err

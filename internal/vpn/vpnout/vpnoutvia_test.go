@@ -274,7 +274,7 @@ func TestVpnOutViaRulesPrioritiesAndTables(t *testing.T) {
 	// The ORDER is the property, not the numbers. The exclusion has to be considered
 	// first, or a carried tunnel that resolves to its carrier's own address wraps the
 	// carrier's handshake inside the carrier.
-	if !(exclude.Priority < steer.Priority) {
+	if exclude.Priority >= steer.Priority {
 		t.Errorf("the exclusion (%d) does not sort before the steer (%d)", exclude.Priority, steer.Priority)
 	}
 	// And both have to be considered before the per-device egress rules, which live at
@@ -780,7 +780,7 @@ func TestVpnOutEgressRoutesAlwaysCarryTheBlackhole(t *testing.T) {
 	// Inert while the tunnel is up: the kernel prefers the lower metric, so the device
 	// route wins every lookup and the blackhole is only ever reached once the device
 	// route is gone with its device.
-	if !(device.Priority < blackhole.Priority) {
+	if device.Priority >= blackhole.Priority {
 		t.Errorf("the device route (metric %d) does not beat the blackhole (metric %d), so the tunnel would black-hole itself",
 			device.Priority, blackhole.Priority)
 	}

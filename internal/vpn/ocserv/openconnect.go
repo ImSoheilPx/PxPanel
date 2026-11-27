@@ -279,9 +279,11 @@ func (s *OcservService) generateServerConfig(inbound *model.Inbound) error {
 	// /etc/ocserv/server-<id> inside it.
 	manifest.PrepareDir("/etc/ocserv", "openconnect")
 	manifest.PrepareDir(dir, "openconnect")
-	os.MkdirAll(dir, 0755)
+	// Best-effort: a failed create surfaces immediately in the config write below.
+	_ = os.MkdirAll(dir, 0o755)
 	manifest.PrepareDir("/var/run/ocserv", "openconnect")
-	os.MkdirAll("/var/run/ocserv", 0755)
+	// Best-effort: ocserv fails visibly at start when its run dir is missing.
+	_ = os.MkdirAll("/var/run/ocserv", 0o755)
 
 	conf := applyCoreConfigOverride("openconnect", inbound.Id, "ocserv.conf",
 		s.buildServerConfig(inbound, settings))
@@ -702,49 +704,6 @@ func probeCmd(name string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), vpnProbeTimeout)
 	defer cancel()
 	return exec.CommandContext(ctx, name, args...).Output()
-}
-
-// killOcservByIP force-disconnects the ocserv session holding tunnel IP `ip` on the
-// given inbound, via occtl. It is the OpenConnect analogue of the RADIUS path's
-// pppd kill (used by the User-Limit "accept" eviction in the radius foundation):
-// occtl has no disconnect-by-IP, so it lists sessions (`show users -j`), finds the
-// one whose assigned IPv4 matches, and disconnects it by session id. Best-effort;
-// any error is ignored.
-func killOcservByIP(inboundId int, ip string) {
-	sock := fmt.Sprintf("/var/run/ocserv/occtl-%d.sock", inboundId)
-	if _, err := os.Stat(sock); err != nil {
-		log.Warning("OpenConnect: cannot evict", ip, "- no occtl socket", sock)
-		return
-	}
-	bin := procmgr.DaemonBin("occtl")
-	out, err := probeCmd(bin, "-s", sock, "-j", "show", "users")
-	if err != nil {
-		log.Warning("OpenConnect: cannot evict", ip, "- occtl show users failed:", err)
-		return
-	}
-	var users []struct {
-		ID   json.Number `json:"ID"`
-		IPv4 string      `json:"IPv4"`
-	}
-	if err := json.Unmarshal(out, &users); err != nil {
-		log.Warning("OpenConnect: cannot evict", ip, "- unreadable occtl output:", err)
-		return
-	}
-	for _, u := range users {
-		if u.IPv4 == ip {
-			if _, err := probeCmd(bin, "-s", sock, "disconnect", "id", u.ID.String()); err != nil {
-				log.Warning("OpenConnect: occtl disconnect id", u.ID.String(), "failed:", err)
-			}
-			return
-		}
-	}
-	// Usually benign: the victim's tunnel was already gone, which is why the panel's view
-	// of it was stale enough to evict. Logged because the other reading is not benign at
-	// all: the caller has already handed this address to the incoming device, and if a
-	// victim IS still connected it now shares it. ocserv will not notice (it registers no
-	// lease for an explicitly assigned address), and one of the two tunnels then stops
-	// receiving while staying connected.
-	log.Infof("OpenConnect: no live ocserv session holds %s, nothing to evict", ip)
 }
 
 // KillClient disconnects a user's active session(s) on an inbound's ocserv via

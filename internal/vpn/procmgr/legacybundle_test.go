@@ -126,9 +126,13 @@ func TestDetectLegacyCores(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			l := withTempLegacyLayout(t)
 			tc.build(t, l)
+			// Compare as sets, in sorted order on BOTH sides: DetectLegacyCores
+			// builds its answer from a map, so the observed order is
+			// nondeterministic and a want written in detection order flakes.
 			got := sortedCores(DetectLegacyCores())
-			if !slices.Equal(got, tc.want) {
-				t.Errorf("DetectLegacyCores() = %v, want %v", got, tc.want)
+			want := slices.Sorted(slices.Values(tc.want))
+			if !slices.Equal(got, want) {
+				t.Errorf("DetectLegacyCores() = %v, want %v", got, want)
 			}
 		})
 	}

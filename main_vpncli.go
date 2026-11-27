@@ -10,6 +10,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -340,7 +341,8 @@ func printPanelInfo(info panelInfo) {
 
 // ctlDial connects to the LIVE panel's control socket.
 func ctlDial() (net.Conn, error) {
-	return net.DialTimeout("unix", ctlSocketPath(), 3*time.Second)
+	dialer := net.Dialer{Timeout: 3 * time.Second}
+	return dialer.DialContext(context.Background(), "unix", ctlSocketPath())
 }
 
 // ctlSend sends one command over conn and returns the panel's reply.
@@ -536,7 +538,11 @@ func publicIPv4() string {
 // fetchPublicIP fetches one echo service and returns a parseable IP, or "".
 func fetchPublicIP(url string) string {
 	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get(url)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	if err != nil {
+		return ""
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return ""
 	}

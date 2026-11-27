@@ -159,7 +159,7 @@ func (s *PptpService) GetTproxyPort(inbound *model.Inbound) int {
 // GetDokodemoConfig builds a dokodemo-door inbound config for TPROXY capture.
 func (s *PptpService) GetDokodemoConfig(inbound *model.Inbound) *xray.InboundConfig {
 	port := s.GetTproxyPort(inbound)
-	settings := fmt.Sprintf(`{"network":"tcp,udp","followRedirect":true}`)
+	settings := `{"network":"tcp,udp","followRedirect":true}`
 	streamSettings := `{"sockopt":{"tproxy":"tproxy","mark":255}}`
 	sniffing := `{"enabled":true,"destOverride":["http","tls"]}`
 
@@ -381,7 +381,9 @@ func (s *PptpService) RestartServices() error {
 	}
 
 	if len(inbounds) == 0 {
-		procmgr.GetProcManager().Stop("pptpd")
+		// Teardown best-effort: nothing is left to serve, and a failed stop is
+		// retried (or surfaces) on the next reconcile.
+		_ = procmgr.GetProcManager().Stop("pptpd")
 		return nil
 	}
 
@@ -397,7 +399,8 @@ func (s *PptpService) RestartServices() error {
 
 // StopServices stops the PPTP (pptpd) child process.
 func (s *PptpService) StopServices() {
-	procmgr.GetProcManager().Stop("pptpd")
+	// Teardown best-effort: the process manager reaps orphans on the next start.
+	_ = procmgr.GetProcManager().Stop("pptpd")
 }
 
 // InitPptp initializes PPTP services on panel startup.

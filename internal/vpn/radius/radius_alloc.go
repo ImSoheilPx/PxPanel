@@ -370,7 +370,9 @@ func (s *RadiusService) allocateBlockIP(inboundId, accountSlot int, blockIPs []s
 			}
 			if !s.ocIsActive(ip) {
 				delete(s.sessions, sid)
-				s.nft.RemoveClientAccounting("openconnect", ip)
+				// Best-effort: the tunnel is gone, so a failed counter teardown
+				// only leaves a stale set to be reclaimed on the next pass.
+				_ = s.nft.RemoveClientAccounting("openconnect", ip)
 				logger.Debugf("RADIUS: oc reclaimed stale block IP %s (ocserv tunnel gone)", ip)
 			}
 		}
@@ -439,7 +441,8 @@ func (s *RadiusService) allocateBlockIP(inboundId, accountSlot int, blockIPs []s
 			// yet = logged skip, nothing torn down blindly), the PPP-kill hook for the
 			// pppd-backed ones. inboundId is this account's inbound — the one whose
 			// daemon holds victimIP.
-			if protocol == "ikev2" {
+			switch protocol {
+			case "ikev2":
 				// A single shared charon serves every inbound — terminate by virtual IP,
 				// ASYNCHRONOUSLY. The kill MUST NOT run inside this RADIUS auth handler:
 				// swanctl --list-sas blocks while THIS device's own IKE_SA is
@@ -451,11 +454,11 @@ func (s *RadiusService) allocateBlockIP(inboundId, accountSlot int, blockIPs []s
 				// the IP, so the just-admitted new device (briefly sharing the reused
 				// vip) is safe.
 				go func() { _ = vpn.EvictProtocolIP("ikev2", victimIP) }()
-			} else if protocol == "openconnect" || protocol == "sstp" {
+			case "openconnect", "sstp":
 				if err := vpn.EvictProtocolIP(protocol, victimIP); err != nil {
 					logger.Debugf("RADIUS: user-limit accept — no %s evictor registered; cannot disconnect %s (%v)", protocol, victimIP, err)
 				}
-			} else {
+			default:
 				s.killPPPByIP(victimIP)
 			}
 			logger.Infof("RADIUS: user-limit accept — evicted oldest device ip=%s proto=%s to admit new device", victimIP, protocol)

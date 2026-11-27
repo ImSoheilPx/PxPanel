@@ -354,14 +354,17 @@ func (s *RadiusService) eapAccept(w radius.ResponseWriter, r *radius.Request, st
 	if st.ntResponse != nil {
 		recvKey, _ := rfc3079.MakeKey(st.ntResponse, []byte(st.password), false)
 		sendKey, _ := rfc3079.MakeKey(st.ntResponse, []byte(st.password), true)
-		microsoft.MSMPPERecvKey_Add(accept, recvKey)
-		microsoft.MSMPPESendKey_Add(accept, sendKey)
+		// Attribute setters can only fail on an over-long value; these keys are
+		// fixed-size and the Accept is what carries them — a failed add would be
+		// invisible to the client anyway.
+		_ = microsoft.MSMPPERecvKey_Add(accept, recvKey)
+		_ = microsoft.MSMPPESendKey_Add(accept, sendKey)
 	}
 
 	if clientIP != nil {
-		rfc2865.FramedIPAddress_Set(accept, clientIP)
+		_ = rfc2865.FramedIPAddress_Set(accept, clientIP)
 	}
-	rfc2869.AcctInterimInterval_Set(accept, rfc2869.AcctInterimInterval(60))
+	_ = rfc2869.AcctInterimInterval_Set(accept, rfc2869.AcctInterimInterval(60))
 
 	s.addMessageAuthenticator(accept)
 	_ = w.Write(accept)

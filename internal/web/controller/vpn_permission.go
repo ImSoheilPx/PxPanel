@@ -245,45 +245,8 @@ func requireClientAccessVpn() gin.HandlerFunc {
 	}
 }
 
-// Refusal text for the routes a reseller can reach with the bits the role derives
-// but must not use (vpn-ui permission.go).
-const (
-	// Both traffic-writing routes hand an account bytes past the quota the
-	// reseller's balance was debited for, and the giveaway comes off the house
-	// rather than off them.
-	msgResellerNoTrafficWrite = "Resellers cannot change an account's traffic counters. Change the account's traffic limit instead."
-	// Both inbound-wide routes are defined over every client on an inbound, which
-	// a reseller shares with admins and with other resellers, so they reach
-	// accounts that are not theirs.
-	msgResellerNoInboundWide = "Resellers cannot run this across a whole inbound: it would reach accounts you do not own."
-)
-
-// denyForResellerVpn refuses an operation outright when the caller is a reseller,
-// and reports whether it answered the request so call sites read as a guard.
-func denyForResellerVpn(c *gin.Context, msg string) bool {
-	user := session.GetLoginUser(c)
-	if user == nil || !callerFlags(c).IsReseller {
-		return false
-	}
-	pureJsonMsg(c, http.StatusOK, false, msg)
-	return true
-}
-
-// callerOwnsInboundVpn answers whether the session user may act on one inbound.
-// (vpn-ui InboundController.callerOwnsInbound.)
-func callerOwnsInboundVpn(c *gin.Context, inboundId int) bool {
-	user := session.GetLoginUser(c)
-	if user == nil {
-		return false
-	}
-	if callerFlags(c).IsSuperAdmin {
-		return true
-	}
-	owns, err := adminaccess.CanAccessInbound(inboundId, user.Id)
-	return err == nil && owns
-}
-
-// callerOwnsInboundsVpn is the plural of callerOwnsInboundVpn.
+// callerOwnsInboundsVpn answers whether the session user may act on the inbound
+// set (vpn-ui InboundController.callerOwnsInbound over every id).
 func callerOwnsInboundsVpn(c *gin.Context, inboundIds []int) bool {
 	user := session.GetLoginUser(c)
 	if user == nil {

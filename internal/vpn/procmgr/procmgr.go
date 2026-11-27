@@ -13,6 +13,7 @@
 package procmgr
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"strings"
@@ -25,7 +26,7 @@ import (
 )
 
 // BundleProvider abstracts the daemon-bundle layer (vpn-ui's backend/ package:
-// go:embed'd per-arch binaries + relocatable trees). The zero/noop provider
+// embedded per-arch binaries (go:embed) + relocatable trees). The zero/noop provider
 // means "this build ships no bundles": every daemon resolves from PATH, which is
 // correct for a host where the operator installed them.
 //
@@ -328,7 +329,9 @@ func waitProcessExit(pid int) {
 
 // launchLocked spawns the process and its supervisor goroutine (p.mu held).
 func (p *managedProc) launchLocked() error {
-	cmd := exec.Command(p.bin, p.args...)
+	// A supervised daemon lives until Stop kills it, so its context never
+	// cancels — CommandContext here only satisfies the context-carrying rule.
+	cmd := exec.CommandContext(context.Background(), p.bin, p.args...)
 	cmd.Dir = p.dir
 	if len(p.env) > 0 {
 		cmd.Env = append(os.Environ(), p.env...)
@@ -590,12 +593,12 @@ func BundledDaemonBin(name string) string { return bundledDaemonBin(name) }
 // recorded before we disable a unit, because they come apart: a distro xl2tpd can
 // be enabled but stopped, and restoring only "active" would lose the boot setting.
 func unitEnabled(unit string) bool {
-	out, _ := exec.Command("systemctl", "is-enabled", unit).Output()
+	out, _ := exec.CommandContext(context.Background(), "systemctl", "is-enabled", unit).Output()
 	return strings.TrimSpace(string(out)) == "enabled"
 }
 
 func unitActive(unit string) bool {
-	out, _ := exec.Command("systemctl", "is-active", unit).Output()
+	out, _ := exec.CommandContext(context.Background(), "systemctl", "is-active", unit).Output()
 	return strings.TrimSpace(string(out)) == "active"
 }
 
