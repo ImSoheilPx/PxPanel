@@ -141,6 +141,11 @@ func run(root, outDir string) error {
 		{
 			Path:        resolveRel(root, "internal/web/controller"),
 			StructAllow: setOf("TgBotCapabilities"),
+			// Empty AliasAllow: controller-local type aliases (e.g.
+			// serviceInboundSvc = service.InboundService, xrayProtocol) are
+			// Go-side conveniences, not API schemas — emitting them produced
+			// dangling TS references to types the walker never emits.
+			AliasAllow: setOf(),
 		},
 		{
 			Path:        resolveRel(root, "internal/amneziawg"),

@@ -1367,39 +1367,6 @@ export const EXAMPLES: Record<string, unknown> = {
     "key": "",
     "value": ""
   },
-  "Sponsor": {
-    "enable": true,
-    "from": "2026-10-01T00:00:00Z",
-    "id": "acme-2026-10",
-    "link": "https://acme.example/?utm_source=pxpanel",
-    "logo": "/sponsors/logo/acme.png",
-    "name": "Acme VPS",
-    "slots": [
-      ""
-    ],
-    "text": {},
-    "title": {},
-    "until": "2026-11-01T00:00:00Z"
-  },
-  "SponsorList": {
-    "contact": "https://t.me/example",
-    "sponsors": [
-      {
-        "enable": true,
-        "from": "2026-10-01T00:00:00Z",
-        "id": "acme-2026-10",
-        "link": "https://acme.example/?utm_source=pxpanel",
-        "logo": "/sponsors/logo/acme.png",
-        "name": "Acme VPS",
-        "slots": [
-          ""
-        ],
-        "text": {},
-        "title": {},
-        "until": "2026-11-01T00:00:00Z"
-      }
-    ]
-  },
   "Status": {
     "amneziawg": null,
     "appStats": null,

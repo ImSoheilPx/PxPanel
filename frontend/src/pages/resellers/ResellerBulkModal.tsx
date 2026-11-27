@@ -130,7 +130,12 @@ export default function ResellerBulkModal({ open, onClose }: Props) {
         layout="vertical"
         initialValues={{ op: 'addInbounds', inboundIds: [], emails: [] }}
       >
-        <Form.Item name="op" label={t('pages.resellers.bulk.op')} rules={[{ required: true }]}>
+        <Form.Item
+          name="op"
+          label={t('pages.resellers.bulk.op')}
+          tooltip={t('pages.resellers.bulk.opHint')}
+          rules={[{ required: true }]}
+        >
           <Select
             options={[
               { value: 'addInbounds', label: t('pages.resellers.bulk.addInbounds') },
@@ -141,6 +146,7 @@ export default function ResellerBulkModal({ open, onClose }: Props) {
         <Form.Item
           name="inboundIds"
           label={t('pages.resellers.bulk.inboundIds')}
+          tooltip={t('pages.resellers.bulk.inboundIdsHint')}
           rules={[{ required: true, message: t('pages.resellers.bulk.pickInbound') }]}
         >
           <Select
@@ -156,6 +162,7 @@ export default function ResellerBulkModal({ open, onClose }: Props) {
         <Form.Item
           name="emails"
           label={t('pages.resellers.bulk.targets')}
+          tooltip={t('pages.resellers.bulk.targetsHint')}
           rules={[{ required: true, message: t('pages.resellers.bulk.pickTargets') }]}
         >
           <Select

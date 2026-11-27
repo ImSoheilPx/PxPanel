@@ -10,6 +10,7 @@ import (
 
 	"github.com/ImSoheilPx/pxpanel/internal/config"
 	"github.com/ImSoheilPx/pxpanel/internal/database"
+	"github.com/ImSoheilPx/pxpanel/internal/vpn"
 )
 
 var migrated struct {
@@ -45,6 +46,13 @@ func InitDB(t testing.TB, path string) {
 	if _, _, err := database.EnsureFirstUser(); err != nil {
 		t.Fatalf("EnsureFirstUser: %v", err)
 	}
+	// A serving panel also has the vpn-layer handle wired (main.go boots with
+	// vpn.SetDB(database.GetDB)). Without it every vpn hook a controller fires
+	// — the accounts mirror on a client delete, the admin-access grant on an
+	// inbound add, the reseller settlement — reads a nil handle and panics,
+	// which surfaced as node-sync contract tests failing with an empty 200.
+	// Same fn pointer as production, so tests exercise the real wiring.
+	vpn.SetDB(database.GetDB)
 }
 
 func migratedTemplate() ([]byte, error) {

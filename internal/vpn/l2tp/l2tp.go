@@ -122,6 +122,12 @@ func (s *L2tpService) getRadiusSecret() string {
 
 func (s *L2tpService) GetL2tpInbounds() ([]*model.Inbound, error) {
 	db := vpn.DB()
+	if db == nil {
+		// The injected-handle contract (infra_ports.go): a nil handle means "no
+		// database", not a panic. The steering gather calls this with no DB in
+		// test builds, where "no inbounds" is the honest answer.
+		return nil, nil
+	}
 	var inbounds []*model.Inbound
 	err := db.Model(model.Inbound{}).Where("protocol = ?", "l2tp").Find(&inbounds).Error
 	return inbounds, err

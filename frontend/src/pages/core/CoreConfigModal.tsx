@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Button, Modal, Select, Space, Spin, message } from 'antd';
+import { Alert, Button, Modal, Select, Space, Spin, Tooltip, message } from 'antd';
 
 import type { CoreConfigTarget } from '@/schemas/api/vpn';
 import { useVpnCoreConfig, useVpnCoreMutations } from '@/api/queries/useVpnCore';
@@ -81,16 +81,18 @@ export default function CoreConfigModal({ core, onClose }: Props) {
         ) : (
           <>
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
-              <Select
-                style={{ width: '100%' }}
-                value={selectedLabel || undefined}
-                onChange={setSelected}
-                aria-label={t('pages.core.config')}
-                options={targets.map((target) => ({
-                  value: targetLabel(target),
-                  label: targetDisplay(target),
-                }))}
-              />
+              <Tooltip title={t('pages.core.configTargetHint')}>
+                <Select
+                  style={{ width: '100%' }}
+                  value={selectedLabel || undefined}
+                  onChange={setSelected}
+                  aria-label={t('pages.core.config')}
+                  options={targets.map((target) => ({
+                    value: targetLabel(target),
+                    label: targetDisplay(target),
+                  }))}
+                />
+              </Tooltip>
               <textarea
                 value={text}
                 onChange={(event) => setText(event.target.value)}

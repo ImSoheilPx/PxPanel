@@ -2672,7 +2672,6 @@
       "dragToReorder": "Перетягніть, щоб змінити порядок {name}"
     },
     "vpnProtocols": {
-      "title": "VPN Protocols",
       "protocolNames": {
         "l2tp": "L2TP/IPsec",
         "pptp": "PPTP",
@@ -2685,15 +2684,11 @@
         "gre": "GRE",
         "ssh": "SSH"
       },
-      "addInbound": "Add Inbound",
-      "editInbound": "Edit Inbound",
       "deleteConfirm": "Delete inbound “{name}”?",
       "accounts": "Accounts",
       "accountsTitle": "Accounts on {name}",
       "accountsOnline": "{count} online",
       "toolbox": "Tools",
-      "toolboxTitle": "Tools — {name}",
-      "listen": "Listen",
       "ipRanges": "IP Ranges",
       "ipRangesHint": "Leave empty to auto-assign; a new range is added automatically when a range fills up.",
       "port": "Port",
@@ -2725,47 +2720,79 @@
       "clientConfigFetch": "Fetch a client config",
       "fields": {
         "dns1": "DNS 1",
+        "dns1Hint": "Primary DNS server pushed to connected clients. Leave empty to keep the server's system resolvers.",
         "dns2": "DNS 2",
+        "dns2Hint": "Secondary DNS server used when the primary does not answer. Leave empty for none.",
         "mtu": "MTU",
+        "mtuHint": "Maximum transmission unit for the tunnel interface. 1400 is a safe value through most networks; lower it if pages hang on some links.",
         "userLimit": "User limit",
+        "userLimitHint": "Maximum number of client accounts allowed on this inbound. 0 means unlimited.",
         "clientToClient": "Client-to-client",
+        "clientToClientHint": "Allow clients of this inbound to reach each other directly instead of only the server.",
         "crossInbound": "Cross-inbound",
+        "crossInboundHint": "Allow clients of this inbound to reach clients of your other inbounds.",
         "externalProxy": "External proxy",
+        "externalProxyHint": "Route this inbound's outbound traffic through the proxy configured on the External Proxy page.",
         "ipsecEnable": "IPsec on",
+        "ipsecEnableHint": "Layer IPsec encryption (L2TP/IPsec) on top of L2TP. Most devices require this to connect.",
         "ipsecPsk": "IPsec PSK",
+        "ipsecPskHint": "Pre-shared key clients must enter alongside username and password for the IPsec layer.",
         "allowRaw": "Allow raw",
+        "allowRawHint": "Also accept raw L2TP (or GRE) traffic without IPsec. Less secure; only for legacy devices.",
         "udpEnable": "UDP transport",
+        "udpEnableHint": "Serve OpenVPN over UDP on this inbound's port.",
         "tcpEnable": "TCP transport",
+        "tcpEnableHint": "Serve OpenVPN over TCP on this inbound’s port. TCP survives stricter networks but is slower.",
         "friendlyName": "Friendly name",
+        "friendlyNameHint": "Name embedded in the generated .ovpn profiles so client apps show it.",
         "tlsCryptEnable": "tls-crypt",
+        "tlsCryptEnableHint": "Add a tls-crypt layer that hides the OpenVPN handshake metadata from DPI.",
         "tlsUseFile": "Load cert from file",
+        "tlsUseFileHint": "Read the TLS certificate and key from files on the server instead of the generated inline pair.",
         "authMode": "Auth mode",
+        "authModeHint": "IKEv2 authentication clients use: eap-mschapv2 (username/password) or psk. Check what your devices support.",
         "psk": "PSK",
+        "pskHint": "Pre-shared key for IKEv2 PSK (machine) authentication.",
         "serverAddr": "Server address",
+        "serverAddrHint": "Address clients are told to connect to. Usually the panel's public domain or IP.",
         "pskEnable": "Preshared keys",
+        "pskEnableHint": "Require a preshared key on top of the public-key handshake (WireGuard-style).",
         "serverPubKey": "Server public key",
+        "serverPubKeyHint": "Server's static public key clients must pin. Generate it on the server before sharing configs.",
         "keyType": "Certificate key type",
         "jc": "Junk packet count",
+        "jcHint": "AmneziaWG junk packet count: junk packets sent before the handshake to defeat DPI.",
         "jmin": "Junk min size",
+        "jminHint": "AmneziaWG minimum junk packet size in bytes. Must be ≤ Jmax.",
         "jmax": "Junk max size",
+        "jmaxHint": "AmneziaWG maximum junk packet size in bytes. Must be ≥ Jmin and fit the MTU.",
         "s1": "Init packet junk",
+        "s1Hint": "AmneziaWG initiation-packet junk size in bytes — pads the first handshake message.",
         "s2": "Response packet junk",
+        "s2Hint": "AmneziaWG response-packet junk size in bytes — pads the reply handshake message.",
         "h1": "Header 1",
+        "h1Hint": "AmneziaWG handshake header 1 value. Server and client configs must agree on the set.",
         "h2": "Header 2",
+        "h2Hint": "AmneziaWG handshake header 2 value.",
         "h3": "Header 3",
+        "h3Hint": "AmneziaWG handshake header 3 value. Leave empty unless your client app requires it.",
         "h4": "Header 4",
+        "h4Hint": "AmneziaWG handshake header 4 value. Leave empty unless your client app requires it.",
         "ttl": "TTL",
+        "ttlHint": "IP GRE header TTL. 64 suits most deployments; 255 helps on some carrier networks.",
         "fouEnable": "FoU on",
-        "fouPort": "FoU port"
+        "fouEnableHint": "Wrap GRE in Foo-over-UDP so intermediate NATs accept the tunnel.",
+        "fouPort": "FoU port",
+        "fouPortHint": "UDP port used for the FoU encapsulation. Clients must target this port."
       },
       "toasts": {
         "deleted": "Inbound deleted",
-        "saved": "Inbound saved",
         "certGenerated": "Certificate generated and applied",
         "remarkRequired": "A remark is required",
         "portRange": "Port must be between 1 and 65535",
         "membershipUpdated": "Membership updated"
-      }
+      },
+      "remoteIdHint": "The identity clients present for EAP authentication — it must match the certificate the server generated."
     },
     "vpnOutbounds": {
       "vpnTitle": "VPN tunnels",
@@ -2799,7 +2826,18 @@
         "tagRequired": "A tag is required",
         "tagExists": "This tag is already used by another tunnel",
         "badSettingsJson": "Settings is not valid JSON"
-      }
+      },
+      "tagHint": "Unique name xray-core uses to reference this outbound in routing rules.",
+      "kindHint": "Tunnel type to dial. Greyed kinds are unavailable on this host (missing kernel module or binary).",
+      "remarkHint": "Free-form note shown in the list; not sent to xray-core.",
+      "enableHint": "Disabled outbounds stay configured but are not dialed.",
+      "addressHint": "SSH server hostname or IP to connect to.",
+      "portHint": "SSH server port. 22 is the default.",
+      "usernameHint": "SSH user to authenticate as.",
+      "authTypeHint": "Sign in with a password or with a private key. Keys are safer for automated tunnels.",
+      "privateKeyHint": "OpenSSH private key (PEM). Stored server-side and never returned to the browser.",
+      "passphraseHint": "Passphrase that protects the private key, if one is set.",
+      "passwordHint": "SSH password for password authentication. Stored server-side and never returned to the browser."
     },
     "resellers": {
       "title": "Resellers",
@@ -2847,14 +2885,30 @@
         "eligible": "Can process",
         "willProcess": "Will be processed",
         "notAffordable": "Not affordable: short by {short} GB. Only the accounts above would be processed if applied.",
-        "applied": "Applied to {applied} accounts, {skipped} skipped"
+        "applied": "Applied to {applied} accounts, {skipped} skipped",
+        "opHint": "Choose whether the chosen clients gain the selected inbounds or lose them.",
+        "inboundIdsHint": "Inbounds the bulk operation applies to.",
+        "targetsHint": "Client accounts (emails) the bulk operation applies to."
       },
       "toasts": {
         "added": "Reseller added",
         "updated": "Reseller updated",
         "deleted": "Reseller deleted",
         "recharged": "Balance updated"
-      }
+      },
+      "usernameHint": "Name the reseller signs in with.",
+      "passwordHint": "Leave empty when editing to keep the current password.",
+      "nicknameHint": "Optional display name shown instead of the username in lists.",
+      "enableHint": "A disabled reseller cannot sign in or create clients.",
+      "unlimitedHint": "Remove the traffic quota entirely — the reseller never runs out of allowance.",
+      "allowanceGbHint": "Traffic quota in GB the reseller may spend creating clients. 0 blocks creation until recharged.",
+      "daysPerGbHint": "Extra validity days granted to clients per GB the reseller spends. 0 disables the bonus.",
+      "minCreateGbHint": "Smallest client quota in GB this reseller is allowed to create at once.",
+      "minAddGbHint": "Smallest traffic top-up in GB this reseller may apply to an existing client.",
+      "allowExternalProxyHint": "Let this reseller's clients use the external proxy feature.",
+      "allowOverviewHint": "Let this reseller see the main traffic overview page.",
+      "allowOverviewManageHint": "Let this reseller also manage (not just view) inbounds on the overview.",
+      "inboundsHint": "Inbounds this reseller may create clients on. Empty means none."
     },
     "admins": {
       "title": "Admins",
@@ -2877,10 +2931,17 @@
         "updated": "Admin updated",
         "deleted": "Admin deleted",
         "reassigned": "{count} inbound(s) reassigned"
-      }
+      },
+      "usernameHint": "Name the admin signs in with.",
+      "passwordHint": "Leave empty when editing to keep the current password.",
+      "nicknameHint": "Optional display name shown instead of the username in lists.",
+      "enableHint": "A disabled admin cannot sign in; their assigned inbounds keep running.",
+      "superAdminHint": "Grants full access to every inbound, setting and page — the permission list below is ignored.",
+      "inboundAccessHint": "Restrict this admin to the selected inbounds. Empty means all inbounds.",
+      "reassignFromHint": "Admin whose inbounds will be moved to another admin.",
+      "reassignToHint": "Admin that will own the source admin's inbounds after the move."
     },
     "core": {
-      "title": "Core Settings",
       "core": "Core",
       "coreNames": {
         "l2tp": "L2TP/IPsec",
@@ -2942,7 +3003,41 @@
         "stopped": "Core stopped",
         "uninstalled": "Core uninstalled",
         "configSaved": "Config saved"
-      }
+      },
+      "provisionHint": "Install the selected cores and prepare their system services, kernel modules and address pools.",
+      "uninstallHint": "Stop and remove the selected non-builtin cores; their inbounds can be kept or deleted.",
+      "coresCard": "VPN cores",
+      "actions": "Actions",
+      "inbounds": "Inbounds",
+      "refreshHint": "Reload core states, versions and host readiness from the server.",
+      "install": "Install",
+      "installHint": "Install this core: prepares its system services, kernel modules and address pools, then brings its daemons up. Same provisioning as the all-cores setup, scoped to this core.",
+      "installConfirm": "Install the {name} core?",
+      "installDesc": "Provisioning runs in the background and a console shows per-step progress. When it finishes, the core's daemons start automatically.",
+      "states": {
+        "running": "Running",
+        "stopped": "Stopped",
+        "idle": "Idle",
+        "not_installed": "Not installed",
+        "error": "Error"
+      },
+      "stats": {
+        "cores": "Cores",
+        "running": "Running",
+        "notInstalled": "Not installed",
+        "inbounds": "Inbounds"
+      },
+      "restartAllHint": "Restart every installed core so new settings take effect.",
+      "restartHint": "Restart this core to apply its current config files.",
+      "logsHint": "Tail this core's service logs to debug connection failures.",
+      "configHint": "Open the generated config files this core writes, and save overrides.",
+      "stopHint": "Stop this core's service. Its inbounds stop accepting connections until restarted.",
+      "ipForwardHint": "Kernel IPv4/IPv6 forwarding — required for tunnel protocols to route client traffic.",
+      "nftablesHint": "nftables firewall — used to NAT client traffic and enforce port rules.",
+      "iprouteHint": "iproute2 (ip/tc) — required to create tunnel interfaces and shape traffic.",
+      "modulesHint": "Kernel modules the cores need. Red tags are required but missing; grey are optional.",
+      "uninstallInboundsModeHint": "Delete removes the inbounds and their accounts; keep leaves them but they cannot connect until a matching core is installed.",
+      "configTargetHint": "Config file to edit: per-inbound entries override what the core generated for that inbound."
     }
   },
   "tgbot": {

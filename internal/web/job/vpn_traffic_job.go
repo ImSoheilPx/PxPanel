@@ -21,8 +21,8 @@ package job
 // from those rows.
 
 import (
-	"github.com/ImSoheilPx/pxpanel/internal/logger"
 	"github.com/ImSoheilPx/pxpanel/internal/database/model"
+	"github.com/ImSoheilPx/pxpanel/internal/logger"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/accounts"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/awg"
@@ -52,13 +52,13 @@ type VpnTrafficJob struct {
 	radius  *radius.RadiusService
 	sweeper *rbridge.Sweeper
 
-	wgc  wgc.WgcService
-	awg  awg.AwgService
-	gre  gre.GreService
-	ikev2 ikev2.Ikev2Service
-	ssh  ssh.SshService
-	l2tp l2tp.L2tpService
-	pptp pptp.PptpService
+	wgc     wgc.WgcService
+	awg     awg.AwgService
+	gre     gre.GreService
+	ikev2   ikev2.Ikev2Service
+	ssh     ssh.SshService
+	l2tp    l2tp.L2tpService
+	pptp    pptp.PptpService
 	openvpn openvpn.OpenVpnService
 	ocserv  ocserv.OcservService
 	sstp    sstp.SstpService

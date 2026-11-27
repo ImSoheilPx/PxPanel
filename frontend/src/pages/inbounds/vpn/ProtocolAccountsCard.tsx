@@ -24,7 +24,8 @@ const deviceConfigText = (entry: DeviceConfigEntry): string => {
 
 interface Props {
   inbound: VpnInboundRow;
-  onClose: () => void;
+  /** Standalone mode only: when omitted (embedded in the info modal) the card hides its own close button. */
+  onClose?: () => void;
 }
 
 // The per-inbound account panel: one page of the account read model scoped to
@@ -136,7 +137,7 @@ export default function ProtocolAccountsCard({ inbound, onClose }: Props) {
             style={{ width: 200 }}
           />
           <Button onClick={() => refetch()}>{t('refresh')}</Button>
-          <Button onClick={onClose}>{t('close')}</Button>
+          {onClose && <Button onClick={onClose}>{t('close')}</Button>}
         </Space>
       }
     >

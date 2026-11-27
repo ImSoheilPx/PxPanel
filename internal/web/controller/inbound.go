@@ -248,6 +248,15 @@ func (a *InboundController) bulkDelInbounds(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
+	// Remember each row's protocol before it goes, so the VPN settle hooks
+	// (accounts mirror + reseller ledger + reconcile) fire per deleted id —
+	// the same tail the single-delete path runs (vpn-ui delInbound).
+	deletedProtocols := make(map[int]model.Protocol, len(req.Ids))
+	for _, id := range req.Ids {
+		if old, gerr := a.inboundService.GetInbound(id); gerr == nil && old != nil {
+			deletedProtocols[id] = old.Protocol
+		}
+	}
 	result, needRestart, err := a.inboundService.DelInbounds(req.Ids)
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
@@ -256,6 +265,11 @@ func (a *InboundController) bulkDelInbounds(c *gin.Context) {
 	jsonObj(c, result, nil)
 	if needRestart {
 		a.xrayService.SetToNeedRestart()
+	}
+	for _, id := range req.Ids {
+		if proto, ok := deletedProtocols[id]; ok {
+			vpnAfterInboundDelete(c, id, proto)
+		}
 	}
 	user := session.GetLoginUser(c)
 	a.broadcastInboundsUpdate(user.Id)

@@ -61,9 +61,7 @@ export type RowAction =
   | 'delete'
   | 'resetTraffic'
   | 'delAllClients'
-  | 'clone'
-  | 'vpnAccounts'
-  | 'vpnToolbox';
+  | 'clone';
 
 export type GeneralAction = 'import' | 'export' | 'subs' | 'resetInbounds';
 

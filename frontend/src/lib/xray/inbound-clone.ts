@@ -15,6 +15,11 @@ export function buildClonePayload(dbInbound: DBInbound, port: number, nodeId: nu
   try {
     const raw = { ...coerceInboundJsonField(dbInbound.settings) };
     raw.clients = [];
+    // VPN protocols (l2tp/pptp): the clone must not inherit the source's
+    // allocated ranges — the backend re-allocates a fresh /24 and rejects
+    // payloads whose ipRanges/localIp collide with in-use allocations.
+    delete raw.ipRanges;
+    delete raw.localIp;
     clonedSettings = JSON.stringify(raw);
   } catch {
     const fallback = createDefaultInboundSettings(dbInbound.protocol);

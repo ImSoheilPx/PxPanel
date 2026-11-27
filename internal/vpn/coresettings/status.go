@@ -181,9 +181,17 @@ func commandExists(name string) bool {
 }
 
 // daemonInstalled reports whether a daemon is available either from the host
-// (in PATH) or from the bundle baked into the binary and extracted at setup.
+// (in PATH) or from the bundle baked into the binary and extracted at setup —
+// or from an ADOPTED previous-install daemon (legacybundle seam). The two
+// relocatable-tree probes matter because accel-ppp and strongSwan are not flat
+// BinDir binaries: their launcher wrappers resolve through AccelBinPath /
+// StrongswanBinPath only. Same resolution order as daemonVersion below.
 func daemonInstalled(name string) bool {
-	return commandExists(name) || procmgr.Bundles().DaemonPath(name) != ""
+	b := procmgr.Bundles()
+	return commandExists(name) ||
+		b.DaemonPath(name) != "" ||
+		b.AccelBinPath(name) != "" ||
+		b.StrongswanBinPath(name) != ""
 }
 
 func systemctlActive(unit string) bool {
@@ -974,6 +982,10 @@ func (s *CoreService) GetSystemStatus() SystemStatus {
 // extracted by Provision). This fallback keeps already-set-up upgrades from
 // regressing to the setup call-to-action.
 func (s *CoreService) IsProvisioned() bool {
+	// Before judging the host, give the one-time legacy scan its chance to
+	// record an upgraded install's adopted cores: on a legacy host neither the
+	// flag nor the daemon probe below can speak for the previous install.
+	ensureLegacyAdoption()
 	if GetVpnProvisioned() {
 		return true
 	}
@@ -990,7 +1002,14 @@ var provisionBaseline = []string{"l2tp", "pptp", "openvpn", "openconnect"}
 // is per-core now, so this is the authoritative "is it installed" answer for
 // everything downstream: the status cards, the inbound-creation gate, and the
 // shared-requirement arithmetic that decides what an uninstall may remove.
+//
+// The one-time legacy adoption scan is hooked here (rather than only at boot)
+// because EVERY installed-set consumer flows through this one read: the boot
+// ownership survey, the status cards, the catalog and the hooks. On an
+// upgraded host the first read after the DB is wired records the previous
+// install's daemons, so the very first status render already sees them.
 func (s *CoreService) provisionedProtocolSet() map[string]bool {
+	ensureLegacyAdoption()
 	set := map[string]bool{}
 	if list := GetProvisionedProtocols(); len(list) > 0 {
 		for _, p := range list {

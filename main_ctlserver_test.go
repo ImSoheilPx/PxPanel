@@ -5,6 +5,7 @@ package main
 // line framing both sides speak. No sockets on disk, no host probing, no root.
 
 import (
+	"bufio"
 	"net"
 	"strings"
 	"testing"
@@ -44,16 +45,28 @@ func TestHandleControlCommandUnknownAndEmpty(t *testing.T) {
 	}
 }
 
+// fakePanelReply is the panel side of a net.Pipe ctl conversation: read the one
+// JSON-line request, then write one reply line. net.Pipe is synchronous — a
+// Write blocks until the peer Reads — so a fake panel that writes without first
+// reading deadlocks against ctlSend's own request Write, which is exactly the
+// hang the first draft of these tests shipped (10m test timeout in CI).
+func fakePanelReply(t *testing.T, conn net.Conn, reply string) {
+	t.Helper()
+	if _, err := bufio.NewReader(conn).ReadString('\n'); err != nil {
+		t.Errorf("fake panel: read request: %v", err)
+		return
+	}
+	if _, err := conn.Write([]byte(reply)); err != nil {
+		t.Errorf("fake panel: write reply: %v", err)
+	}
+	_ = conn.Close()
+}
+
 func TestCtlSendFraming(t *testing.T) {
 	client, server := net.Pipe()
 	defer client.Close()
-	defer server.Close()
 
-	go func() {
-		// The panel side: one JSON line back (writeControlResponse's shape).
-		_, _ = server.Write([]byte("{\"ok\":true,\"msg\":\"pong\"}\n"))
-		server.Close()
-	}()
+	go fakePanelReply(t, server, "{\"ok\":true,\"msg\":\"pong\"}\n")
 
 	resp, err := ctlSend(client, "ping")
 	if err != nil {
@@ -67,12 +80,8 @@ func TestCtlSendFraming(t *testing.T) {
 func TestCtlSendMalformedReply(t *testing.T) {
 	client, server := net.Pipe()
 	defer client.Close()
-	defer server.Close()
 
-	go func() {
-		_, _ = server.Write([]byte("not json at all\n"))
-		server.Close()
-	}()
+	go fakePanelReply(t, server, "not json at all\n")
 
 	_, err := ctlSend(client, "ping")
 	if err == nil || !strings.Contains(err.Error(), "malformed reply") {

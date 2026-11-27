@@ -3734,7 +3734,17 @@
               "mtproto",
               "amneziawg",
               "tuic",
-              "masque"
+              "masque",
+              "l2tp",
+              "pptp",
+              "openvpn",
+              "openconnect",
+              "sstp",
+              "ikev2",
+              "wg-c",
+              "awg",
+              "gre",
+              "ssh"
             ],
             "example": "vless",
             "type": "string"
@@ -4191,7 +4201,7 @@
         "type": "object"
       },
       "Node": {
-        "description": "Node represents a remote pxpanel panel registered with the central panel.\nThe central panel polls each node's existing /panel/api/server/status\nendpoint over HTTP using the per-node ApiToken to populate the runtime\nstatus fields below.",
+        "description": "Node represents a remote 3pxpanel panel registered with the central panel.\nThe central panel polls each node's existing /panel/api/server/status\nendpoint over HTTP using the per-node ApiToken to populate the runtime\nstatus fields below.",
         "properties": {
           "activeCount": {
             "example": 23,
@@ -5368,7 +5378,7 @@
         "type": "object"
       },
       "Setting": {
-        "description": "Setting stores key-value configuration settings for the pxpanel panel.",
+        "description": "Setting stores key-value configuration settings for the panel.",
         "properties": {
           "id": {
             "type": "integer"
@@ -5384,90 +5394,6 @@
           "id",
           "key",
           "value"
-        ],
-        "type": "object"
-      },
-      "Sponsor": {
-        "description": "Sponsor is one paid placement published in the repo's sponsors.json.",
-        "properties": {
-          "enable": {
-            "example": true,
-            "nullable": true,
-            "type": "boolean"
-          },
-          "from": {
-            "example": "2026-10-01T00:00:00Z",
-            "format": "date-time",
-            "nullable": true,
-            "type": "string"
-          },
-          "id": {
-            "example": "acme-2026-10",
-            "type": "string"
-          },
-          "link": {
-            "example": "https://acme.example/?utm_source=pxpanel",
-            "type": "string"
-          },
-          "logo": {
-            "example": "/sponsors/logo/acme.png",
-            "type": "string"
-          },
-          "name": {
-            "example": "Acme VPS",
-            "type": "string"
-          },
-          "slots": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "text": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object"
-          },
-          "title": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object"
-          },
-          "until": {
-            "example": "2026-11-01T00:00:00Z",
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "link",
-          "name",
-          "slots",
-          "text",
-          "title",
-          "until"
-        ],
-        "type": "object"
-      },
-      "SponsorList": {
-        "description": "SponsorList is the active sponsor set plus the contact link for new sponsors.",
-        "properties": {
-          "contact": {
-            "example": "https://t.me/example",
-            "type": "string"
-          },
-          "sponsors": {
-            "items": {
-              "$ref": "#/components/schemas/Sponsor"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "sponsors"
         ],
         "type": "object"
       },
@@ -5773,7 +5699,7 @@
         "type": "object"
       },
       "User": {
-        "description": "User represents a user account in the pxpanel panel.",
+        "description": "User represents a user account in the panel.",
         "properties": {
           "id": {
             "type": "integer"

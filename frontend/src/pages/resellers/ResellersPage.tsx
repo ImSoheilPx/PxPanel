@@ -19,6 +19,7 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -291,13 +292,15 @@ export default function ResellersPage() {
           okText={t('pages.resellers.recharge')}
           cancelText={t('cancel')}
         >
-          <InputNumber
-            style={{ width: '100%' }}
-            aria-label={t('pages.resellers.recharge')}
-            value={rechargeGb}
-            onChange={(v) => setRechargeGb(v ?? 0)}
-            addonAfter="GB"
-          />
+          <Tooltip title={t('pages.resellers.rechargeHint')}>
+            <InputNumber
+              style={{ width: '100%' }}
+              aria-label={t('pages.resellers.recharge')}
+              value={rechargeGb}
+              onChange={(v) => setRechargeGb(v ?? 0)}
+              addonAfter="GB"
+            />
+          </Tooltip>
           <p style={{ marginTop: 8 }}>{t('pages.resellers.rechargeHint')}</p>
         </Modal>
 
@@ -385,6 +388,7 @@ export function ResellerFormModal({
           <Form.Item
             name="username"
             label={t('pages.resellers.username')}
+            tooltip={t('pages.resellers.usernameHint')}
             rules={[{ required: true }]}
           >
             <Input style={{ width: 200 }} />
@@ -392,42 +396,71 @@ export function ResellerFormModal({
           <Form.Item
             name="password"
             label={t('password')}
+            tooltip={t('pages.resellers.passwordHint')}
             extra={reseller ? t('pages.resellers.passwordKeepHint') : undefined}
             rules={reseller ? [] : [{ required: true }]}
           >
             <Input.Password style={{ width: 200 }} />
           </Form.Item>
-          <Form.Item name="nickname" label={t('pages.resellers.nickname')}>
+          <Form.Item
+            name="nickname"
+            label={t('pages.resellers.nickname')}
+            tooltip={t('pages.resellers.nicknameHint')}
+          >
             <Input style={{ width: 160 }} />
           </Form.Item>
-          <Form.Item name="enable" label={t('enable')} valuePropName="checked">
+          <Form.Item
+            name="enable"
+            label={t('enable')}
+            tooltip={t('pages.resellers.enableHint')}
+            valuePropName="checked"
+          >
             <Switch />
           </Form.Item>
         </Space>
         <Space size="middle" wrap>
-          <Form.Item name="unlimited" label={t('unlimited')} valuePropName="checked">
+          <Form.Item
+            name="unlimited"
+            label={t('unlimited')}
+            tooltip={t('pages.resellers.unlimitedHint')}
+            valuePropName="checked"
+          >
             <Switch />
           </Form.Item>
           <Form.Item
             name="allowanceGb"
             label={t('pages.resellers.allowanceGb')}
+            tooltip={t('pages.resellers.allowanceGbHint')}
             extra={reseller ? t('pages.resellers.allowanceIgnoredOnEdit') : undefined}
           >
             <InputNumber min={0} />
           </Form.Item>
-          <Form.Item name="daysPerGb" label={t('pages.resellers.daysPerGb')}>
+          <Form.Item
+            name="daysPerGb"
+            label={t('pages.resellers.daysPerGb')}
+            tooltip={t('pages.resellers.daysPerGbHint')}
+          >
             <InputNumber min={0} />
           </Form.Item>
-          <Form.Item name="minCreateGb" label={t('pages.resellers.minCreateGb')}>
+          <Form.Item
+            name="minCreateGb"
+            label={t('pages.resellers.minCreateGb')}
+            tooltip={t('pages.resellers.minCreateGbHint')}
+          >
             <InputNumber min={0} />
           </Form.Item>
-          <Form.Item name="minAddGb" label={t('pages.resellers.minAddGb')}>
+          <Form.Item
+            name="minAddGb"
+            label={t('pages.resellers.minAddGb')}
+            tooltip={t('pages.resellers.minAddGbHint')}
+          >
             <InputNumber min={0} />
           </Form.Item>
         </Space>
         <Form.Item
           name="allowExternalProxy"
           label={t('pages.resellers.allowExternalProxy')}
+          tooltip={t('pages.resellers.allowExternalProxyHint')}
           valuePropName="checked"
         >
           <Switch />
@@ -436,6 +469,7 @@ export function ResellerFormModal({
           <Form.Item
             name="allowOverview"
             label={t('pages.resellers.allowOverview')}
+            tooltip={t('pages.resellers.allowOverviewHint')}
             valuePropName="checked"
           >
             <Switch />
@@ -443,12 +477,17 @@ export function ResellerFormModal({
           <Form.Item
             name="allowOverviewManage"
             label={t('pages.resellers.allowOverviewManage')}
+            tooltip={t('pages.resellers.allowOverviewManageHint')}
             valuePropName="checked"
           >
             <Switch />
           </Form.Item>
         </Space>
-        <Form.Item name="inboundIds" label={t('pages.resellers.inbounds')}>
+        <Form.Item
+          name="inboundIds"
+          label={t('pages.resellers.inbounds')}
+          tooltip={t('pages.resellers.inboundsHint')}
+        >
           <Select
             mode="multiple"
             allowClear

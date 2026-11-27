@@ -15,11 +15,23 @@ import {
   Select,
   Space,
   Spin,
+  Statistic,
   Table,
   Tag,
+  Tooltip,
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import {
+  ApartmentOutlined,
+  CheckCircleOutlined,
+  ClusterOutlined,
+  DownloadOutlined,
+  FileTextOutlined,
+  PauseCircleOutlined,
+  ReloadOutlined,
+  SettingOutlined,
+} from '@ant-design/icons';
 
 import { useTheme } from '@/hooks/useTheme';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -35,6 +47,28 @@ import {
   useVpnUninstallStatus,
 } from '@/api/queries/useVpnCore';
 import CoreConfigModal from './CoreConfigModal';
+import './CoreSettingsPage.css';
+
+// Localized tag colors per backend CoreState (internal/vpn/coresettings/status.go):
+// running is healthy, stopped/error are faults, idle and not_installed are
+// expected states a core rests in until the operator acts on it.
+const STATE_TAG_COLORS: Record<string, string> = {
+  running: 'green',
+  stopped: 'red',
+  error: 'volcano',
+  idle: 'default',
+  not_installed: 'default',
+};
+
+function CoreStateTag({ state }: { state: string }) {
+  const { t } = useTranslation();
+  const key = state || 'unknown';
+  return (
+    <Tag color={STATE_TAG_COLORS[key] ?? 'default'}>
+      {t(`pages.core.states.${key}`, { defaultValue: state || '—' })}
+    </Tag>
+  );
+}
 
 export default function CoreSettingsPage() {
   const { t } = useTranslation();
@@ -57,6 +91,31 @@ export default function CoreSettingsPage() {
   const uninstallRunning = useVpnUninstallStatus(consoleOpen && consoleMode === 'uninstall');
   const { restart, restartAll, stop, reboot, startProvision, startUninstall } =
     useVpnCoreMutations();
+
+  // Cores the catalog offers as real install targets (non-builtin). A row gets
+  // its Install button only when BOTH the status says not_installed AND the
+  // catalog lists the core here: ipsec and radius are derived rows with no
+  // install step of their own, and posting them to the provision endpoint
+  // would be filtered out server-side and fall through to an all-cores run.
+  const installableNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const entry of catalog?.cores ?? []) {
+      if (!entry.builtin) names.add(entry.name);
+    }
+    return names;
+  }, [catalog]);
+
+  const stats = useMemo(() => {
+    let running = 0;
+    let notInstalled = 0;
+    let inbounds = 0;
+    for (const core of status?.cores ?? []) {
+      if (core.state === 'running') running += 1;
+      if (core.state === 'not_installed') notInstalled += 1;
+      inbounds += core.inbounds ?? 0;
+    }
+    return { total: status?.cores.length ?? 0, running, notInstalled, inbounds };
+  }, [status]);
 
   const onRestart = useCallback(
     async (core: string) => {
@@ -105,10 +164,38 @@ export default function CoreSettingsPage() {
     });
   }, [modal, reboot, messageApi, t]);
 
+  // Per-core install: the same background provisioning the all-cores setup
+  // runs, scoped to one core via the `cores` form field (POST
+  // /panel/api/core/provision). The shared console shows the live per-step
+  // progress; the backend brings the core's daemons up when it finishes.
+  const onInstall = useCallback(
+    (core: string) => {
+      modal.confirm({
+        title: t('pages.core.installConfirm', { name: t(`pages.core.coreNames.${core}`) }),
+        content: t('pages.core.installDesc'),
+        okText: t('pages.core.install'),
+        cancelText: t('cancel'),
+        onOk: async () => {
+          const state = await startProvision([core]);
+          if (state) {
+            setConsoleMode('provision');
+            setConsoleOpen(true);
+            void refetch();
+          } else {
+            messageApi.error(t('somethingWentWrong'));
+          }
+        },
+      });
+    },
+    [modal, startProvision, refetch, messageApi, t],
+  );
+
   const onProvision = useCallback(() => {
-    const installed = new Set((status?.cores ?? []).map((core) => core.name));
+    // The catalog's own installed flag is the authoritative install state; the
+    // status rows name every core whether installed or not, so they cannot
+    // drive this picker.
     const installable = (catalog?.cores ?? []).filter(
-      (entry) => !entry.builtin && !installed.has(entry.name),
+      (entry) => !entry.builtin && !entry.installed,
     );
     if (installable.length === 0) {
       messageApi.info(t('pages.core.everythingInstalled'));
@@ -146,7 +233,7 @@ export default function CoreSettingsPage() {
         }
       },
     });
-  }, [modal, catalog, status, startProvision, refetch, messageApi, t]);
+  }, [modal, catalog, startProvision, refetch, messageApi, t]);
 
   const onUninstall = useCallback(() => {
     const uninstallable = (catalog?.cores ?? []).filter(
@@ -170,18 +257,20 @@ export default function CoreSettingsPage() {
             }}
           />
           <p style={{ marginTop: 12 }}>{t('pages.core.uninstallInboundsQuestion')}</p>
-          <Select
-            defaultValue="delete"
-            style={{ width: 240 }}
-            aria-label={t('pages.core.uninstallInboundsQuestion')}
-            options={[
-              { value: 'delete', label: t('pages.core.uninstallDeleteInbounds') },
-              { value: 'keep', label: t('pages.core.uninstallKeepInbounds') },
-            ]}
-            onChange={(value) => {
-              inboundsMode = value as 'delete' | 'keep';
-            }}
-          />
+          <Tooltip title={t('pages.core.uninstallInboundsModeHint')}>
+            <Select
+              defaultValue="delete"
+              style={{ width: 240 }}
+              aria-label={t('pages.core.uninstallInboundsQuestion')}
+              options={[
+                { value: 'delete', label: t('pages.core.uninstallDeleteInbounds') },
+                { value: 'keep', label: t('pages.core.uninstallKeepInbounds') },
+              ]}
+              onChange={(value) => {
+                inboundsMode = value as 'delete' | 'keep';
+              }}
+            />
+          </Tooltip>
         </div>
       ),
       width: 560,
@@ -228,43 +317,89 @@ export default function CoreSettingsPage() {
       {
         title: t('status'),
         dataIndex: 'state',
-        render: (state: string) => {
-          const color =
-            state === 'running'
-              ? 'green'
-              : state === 'stopped' || state === 'uninstalled'
-                ? 'red'
-                : 'default';
-          return <Tag color={color}>{state || '—'}</Tag>;
-        },
+        render: (state: string) => <CoreStateTag state={state} />,
       },
       { title: t('pages.core.detail'), dataIndex: 'detail', ellipsis: true },
       {
-        title: t('pages.admins.inboundCount'),
+        title: t('pages.core.inbounds'),
         dataIndex: 'inbounds',
+        align: 'center',
         render: (count) => count ?? 0,
       },
       {
-        title: '',
-        render: (_, row) => (
-          <Space>
-            <Button size="small" type="link" onClick={() => onRestart(row.name)}>
-              {t('pages.core.restart')}
-            </Button>
-            <Button size="small" type="link" onClick={() => setLogsFor(row.name)}>
-              {t('pages.core.logs')}
-            </Button>
-            <Button size="small" type="link" onClick={() => setConfigFor(row.name)}>
-              {t('pages.core.config')}
-            </Button>
-            <Button size="small" type="link" danger onClick={() => onStop(row.name)}>
-              {t('pages.core.stop')}
-            </Button>
-          </Space>
-        ),
+        title: t('pages.core.actions'),
+        key: 'actions',
+        width: 200,
+        render: (_, row) => {
+          if (row.state === 'not_installed') {
+            // Only catalog install targets get the button; derived rows
+            // (ipsec, radius) have nothing of their own to install.
+            return installableNames.has(row.name) ? (
+              <Tooltip title={t('pages.core.installHint')}>
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<DownloadOutlined aria-hidden />}
+                  onClick={() => onInstall(row.name)}
+                >
+                  {t('pages.core.install')}
+                </Button>
+              </Tooltip>
+            ) : (
+              <span style={{ opacity: 0.4 }}>—</span>
+            );
+          }
+          return (
+            <Space size={0}>
+              <Tooltip title={t('pages.core.restartHint')}>
+                <Button
+                  type="text"
+                  size="small"
+                  style={{ fontSize: 16 }}
+                  icon={<ReloadOutlined aria-hidden />}
+                  aria-label={t('pages.core.restart')}
+                  onClick={() => onRestart(row.name)}
+                />
+              </Tooltip>
+              <Tooltip title={t('pages.core.logsHint')}>
+                <Button
+                  type="text"
+                  size="small"
+                  style={{ fontSize: 16 }}
+                  icon={<FileTextOutlined aria-hidden />}
+                  aria-label={t('pages.core.logs')}
+                  onClick={() => setLogsFor(row.name)}
+                />
+              </Tooltip>
+              <Tooltip title={t('pages.core.configHint')}>
+                <Button
+                  type="text"
+                  size="small"
+                  style={{ fontSize: 16 }}
+                  icon={<SettingOutlined aria-hidden />}
+                  aria-label={t('pages.core.config')}
+                  onClick={() => setConfigFor(row.name)}
+                />
+              </Tooltip>
+              {row.state === 'running' && (
+                <Tooltip title={t('pages.core.stopHint')}>
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    style={{ fontSize: 16 }}
+                    icon={<PauseCircleOutlined aria-hidden />}
+                    aria-label={t('pages.core.stop')}
+                    onClick={() => onStop(row.name)}
+                  />
+                </Tooltip>
+              )}
+            </Space>
+          );
+        },
       },
     ],
-    [t, onRestart, onStop],
+    [t, installableNames, onInstall, onRestart, onStop],
   );
 
   const pageClass = useMemo(() => {
@@ -296,9 +431,11 @@ export default function CoreSettingsPage() {
                         (status.rebootPkg ? ` · ${status.rebootPkg}` : '')
                       }
                       action={
-                        <Button size="small" danger onClick={onReboot}>
-                          {t('pages.core.reboot')}
-                        </Button>
+                        <Tooltip title={t('pages.core.rebootHint')}>
+                          <Button size="small" danger onClick={onReboot}>
+                            {t('pages.core.reboot')}
+                          </Button>
+                        </Tooltip>
                       }
                     />
                   </Col>
@@ -311,30 +448,83 @@ export default function CoreSettingsPage() {
                       message={t('pages.core.notProvisioned')}
                       description={t('pages.core.notProvisionedHint')}
                       action={
-                        <Button size="small" type="primary" onClick={onProvision}>
-                          {t('pages.core.provision')}
-                        </Button>
+                        <Tooltip title={t('pages.core.provisionHint')}>
+                          <Button size="small" type="primary" onClick={onProvision}>
+                            {t('pages.core.provision')}
+                          </Button>
+                        </Tooltip>
                       }
                     />
                   </Col>
                 )}
                 <Col span={24}>
-                  <Card
-                    size="small"
-                    title={t('pages.core.title')}
-                    extra={
-                      <Space>
-                        <Button onClick={() => refetch()}>{t('refresh')}</Button>
-                        <Button onClick={onProvision}>{t('pages.core.provision')}</Button>
-                        <Button danger onClick={onUninstall}>
-                          {t('pages.core.uninstall')}
+                  <Card size="small" hoverable className="summary-card">
+                    <Row gutter={[16, isMobile ? 16 : 12]}>
+                      <Col xs={12} md={6}>
+                        <Statistic
+                          title={t('pages.core.stats.cores')}
+                          value={stats.total}
+                          prefix={<ClusterOutlined aria-hidden />}
+                        />
+                      </Col>
+                      <Col xs={12} md={6}>
+                        <Statistic
+                          title={t('pages.core.stats.running')}
+                          value={stats.running}
+                          prefix={
+                            <CheckCircleOutlined
+                              aria-hidden
+                              style={{ color: 'var(--ant-color-success)' }}
+                            />
+                          }
+                        />
+                      </Col>
+                      <Col xs={12} md={6}>
+                        <Statistic
+                          title={t('pages.core.stats.notInstalled')}
+                          value={stats.notInstalled}
+                          prefix={
+                            <DownloadOutlined
+                              aria-hidden
+                              style={{ color: 'var(--ant-color-warning)' }}
+                            />
+                          }
+                        />
+                      </Col>
+                      <Col xs={12} md={6}>
+                        <Statistic
+                          title={t('pages.core.stats.inbounds')}
+                          value={stats.inbounds}
+                          prefix={<ApartmentOutlined aria-hidden />}
+                        />
+                      </Col>
+                    </Row>
+                  </Card>
+                </Col>
+                <Col span={24}>
+                  <Card size="small" hoverable title={t('pages.core.coresCard')}>
+                    <div className="toolbar">
+                      <Tooltip title={t('pages.core.refreshHint')}>
+                        <Button icon={<ReloadOutlined aria-hidden />} onClick={() => refetch()}>
+                          {t('refresh')}
                         </Button>
-                        <Button type="primary" onClick={onRestartAll}>
-                          {t('pages.core.restartAll')}
-                        </Button>
+                      </Tooltip>
+                      <Space wrap>
+                        <Tooltip title={t('pages.core.provisionHint')}>
+                          <Button onClick={onProvision}>{t('pages.core.provision')}</Button>
+                        </Tooltip>
+                        <Tooltip title={t('pages.core.uninstallHint')}>
+                          <Button danger onClick={onUninstall}>
+                            {t('pages.core.uninstall')}
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title={t('pages.core.restartAllHint')}>
+                          <Button type="primary" onClick={onRestartAll}>
+                            {t('pages.core.restartAll')}
+                          </Button>
+                        </Tooltip>
                       </Space>
-                    }
-                  >
+                    </div>
                     <Table<CoreStatus>
                       rowKey="name"
                       size="small"
@@ -342,30 +532,55 @@ export default function CoreSettingsPage() {
                       columns={statusColumns}
                       dataSource={status?.cores ?? []}
                       pagination={false}
+                      scroll={{ x: 'max-content' }}
                       locale={{ emptyText: t('noData') }}
                     />
                   </Card>
                 </Col>
                 {system && (
                   <Col span={24}>
-                    <Card size="small" title={t('pages.core.system')}>
+                    <Card size="small" hoverable title={t('pages.core.system')}>
                       <Descriptions size="small" column={2}>
-                        <Descriptions.Item label={t('pages.core.ipForward')}>
+                        <Descriptions.Item
+                          label={
+                            <Tooltip title={t('pages.core.ipForwardHint')}>
+                              <span>{t('pages.core.ipForward')}</span>
+                            </Tooltip>
+                          }
+                        >
                           <Tag color={system.ipForward ? 'green' : 'red'}>
                             {system.ipForward ? t('enabled') : t('disabled')}
                           </Tag>
                         </Descriptions.Item>
-                        <Descriptions.Item label={t('pages.core.nftables')}>
+                        <Descriptions.Item
+                          label={
+                            <Tooltip title={t('pages.core.nftablesHint')}>
+                              <span>{t('pages.core.nftables')}</span>
+                            </Tooltip>
+                          }
+                        >
                           <Tag color={system.nftables ? 'green' : 'red'}>
                             {system.nftables ? t('enabled') : t('disabled')}
                           </Tag>
                         </Descriptions.Item>
-                        <Descriptions.Item label={t('pages.core.iproute')}>
+                        <Descriptions.Item
+                          label={
+                            <Tooltip title={t('pages.core.iprouteHint')}>
+                              <span>{t('pages.core.iproute')}</span>
+                            </Tooltip>
+                          }
+                        >
                           <Tag color={system.iproute ? 'green' : 'red'}>
                             {system.iproute ? t('enabled') : t('disabled')}
                           </Tag>
                         </Descriptions.Item>
-                        <Descriptions.Item label={t('pages.core.modules')}>
+                        <Descriptions.Item
+                          label={
+                            <Tooltip title={t('pages.core.modulesHint')}>
+                              <span>{t('pages.core.modules')}</span>
+                            </Tooltip>
+                          }
+                        >
                           <Space wrap size={4}>
                             {system.modules.map((module) => (
                               <Tag

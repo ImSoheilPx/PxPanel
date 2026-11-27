@@ -47,9 +47,7 @@ const PromptModal = lazy(() => import('@/components/feedback/PromptModal'));
 
 import { useInbounds } from './useInbounds';
 import { InboundList } from './list';
-import { vpnRowFromRecord, type VpnRowSource } from './vpn/vpnRow';
-import { isVpnProtocol, type VpnProtocol } from '@/schemas/api/vpn';
-import type { VpnInboundRow } from '@/api/queries/useVpnProtocols';
+import { isVpnProtocol } from '@/schemas/api/vpn';
 import { LazyMount } from '@/components/utility';
 const InboundFormModal = lazy(() => import('./form/InboundFormModal'));
 const CloneInboundModal = lazy(() => import('./CloneInboundModal'));
@@ -58,11 +56,10 @@ const AttachClientsModal = lazy(() => import('./clients/AttachClientsModal'));
 const AttachExistingClientsModal = lazy(() => import('./clients/AttachExistingClientsModal'));
 const DetachClientsModal = lazy(() => import('./clients/DetachClientsModal'));
 const AddClientsToGroupModal = lazy(() => import('./clients/AddClientsToGroupModal'));
-// VPN-protocol specifics (moved from the removed /vpn-protocols page): the
-// add/edit form, the per-inbound accounts panel and the cert/config toolbox.
-const ProtocolInboundModal = lazy(() => import('./vpn/ProtocolInboundModal'));
-const ProtocolAccountsCard = lazy(() => import('./vpn/ProtocolAccountsCard'));
-const ProtocolToolboxModal = lazy(() => import('./vpn/ProtocolToolboxModal'));
+// Vpn-protocol rows (l2tp, openvpn, ssh, ...) share the standard add/modify
+// dialog, row actions and info modal; their per-protocol fields live in the
+// form's Protocol tab (form/protocols/vpn.tsx) and their accounts/tools in the
+// info modal's tabs.
 
 type RowAction =
   | 'edit'
@@ -77,9 +74,7 @@ type RowAction =
   | 'attachExisting'
   | 'detachClients'
   | 'addToGroup'
-  | 'clone'
-  | 'vpnAccounts'
-  | 'vpnToolbox';
+  | 'clone';
 
 type GeneralAction = 'import' | 'export' | 'subs' | 'resetInbounds';
 
@@ -187,16 +182,6 @@ export default function InboundsPage() {
 
   const [cloneOpen, setCloneOpen] = useState(false);
   const [cloneSource, setCloneSource] = useState<DBInbound | null>(null);
-
-  // VPN-protocol flows (from the removed /vpn-protocols page). vpnEditing is
-  // null in add mode — the protocol then comes from vpnFormProtocol, set by
-  // the add-flow picker handoff.
-  const [vpnFormOpen, setVpnFormOpen] = useState(false);
-  const [vpnFormProtocol, setVpnFormProtocol] = useState<VpnProtocol>('l2tp');
-  const [vpnEditing, setVpnEditing] = useState<VpnInboundRow | null>(null);
-  const [vpnToolboxFor, setVpnToolboxFor] = useState<VpnInboundRow | null>(null);
-  const [vpnAccountsOpen, setVpnAccountsOpen] = useState(false);
-  const [vpnAccountsFor, setVpnAccountsFor] = useState<VpnInboundRow | null>(null);
 
   const [textOpen, setTextOpen] = useState(false);
   const [textTitle, setTextTitle] = useState('');
@@ -493,20 +478,6 @@ export default function InboundsPage() {
     setFormOpen(true);
   }, []);
 
-  // The add-flow protocol picker hands VPN picks over here; close the xray
-  // form untouched and open the vpn-specific inbound form instead.
-  const onVpnProtocolPicked = useCallback((protocol: VpnProtocol) => {
-    setFormOpen(false);
-    setVpnEditing(null);
-    setVpnFormProtocol(protocol);
-    setVpnFormOpen(true);
-  }, []);
-
-  const openVpnEdit = useCallback((target: VpnRowSource) => {
-    setVpnEditing(vpnRowFromRecord(target));
-    setVpnFormOpen(true);
-  }, []);
-
   const openEdit = useCallback((dbInbound: DBInbound) => {
     setFormMode('edit');
     setFormDbInbound(dbInbound);
@@ -709,17 +680,9 @@ export default function InboundsPage() {
       }
       switch (key) {
         case 'edit':
-          // VPN-protocol rows edit through the vpn-specific form; it needs the
-          // full settings payload, which the hydration above already fetched.
-          if (isVpnProtocol(target.protocol)) openVpnEdit(target);
-          else openEdit(target);
-          break;
-        case 'vpnAccounts':
-          setVpnAccountsFor(vpnRowFromRecord(target));
-          setVpnAccountsOpen(true);
-          break;
-        case 'vpnToolbox':
-          setVpnToolboxFor(vpnRowFromRecord(target));
+          // Vpn-protocol rows go through the same standard modify dialog; the
+          // full settings payload they need is what the hydration above fetched.
+          openEdit(target);
           break;
         case 'showInfo':
           setInfoDbInbound(checkFallback(target));
@@ -770,7 +733,6 @@ export default function InboundsPage() {
     [
       hydrateInbound,
       openEdit,
-      openVpnEdit,
       checkFallback,
       findClientIndex,
       exportInboundLinks,
@@ -896,35 +858,7 @@ export default function InboundsPage() {
             dbInbounds={dbInbounds}
             availableNodes={nodesList}
             availableNodesFetched={nodesFetched}
-            onVpnProtocolPicked={onVpnProtocolPicked}
           />
-        </LazyMount>
-        <LazyMount when={vpnFormOpen}>
-          <ProtocolInboundModal
-            open={vpnFormOpen}
-            protocol={vpnFormProtocol}
-            inbound={vpnEditing}
-            onClose={() => setVpnFormOpen(false)}
-          />
-        </LazyMount>
-        <LazyMount when={vpnToolboxFor !== null}>
-          <ProtocolToolboxModal inbound={vpnToolboxFor} onClose={() => setVpnToolboxFor(null)} />
-        </LazyMount>
-        <LazyMount when={vpnAccountsOpen}>
-          <Modal
-            open={vpnAccountsOpen}
-            onCancel={() => setVpnAccountsOpen(false)}
-            footer={null}
-            width={920}
-            title={null}
-          >
-            {vpnAccountsFor && (
-              <ProtocolAccountsCard
-                inbound={vpnAccountsFor}
-                onClose={() => setVpnAccountsOpen(false)}
-              />
-            )}
-          </Modal>
         </LazyMount>
         <LazyMount when={infoOpen}>
           <InboundInfoModal

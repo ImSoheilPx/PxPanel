@@ -18,6 +18,10 @@ import {
 } from '@/lib/xray/inbound-link';
 import { inboundFromDb } from '@/lib/xray/inbound-from-db';
 import { hostLinksClosed, withHostEndpoints } from '@/lib/hosts/host-link';
+import { isVpnProtocol } from '@/schemas/api/vpn';
+import { vpnRowFromRecord } from '../vpn/vpnRow';
+import ProtocolAccountsCard from '../vpn/ProtocolAccountsCard';
+import ProtocolToolboxContent from '../vpn/ProtocolToolboxContent';
 
 import {
   buildInboundInfo,
@@ -291,6 +295,14 @@ export default function InboundInfoModal({
     const remained = clientStats.total - clientStats.up - clientStats.down;
     return remained > 0 ? SizeFormatter.sizeFormat(remained) : '-';
   }, [clientStats, clientSettings]);
+
+  // Vpn-protocol rows carry their accounts panel and toolbox as extra tabs of
+  // this modal (their row-action dropdown stays at parity with native rows).
+  const isVpnRow = isVpnProtocol(dbInbound?.protocol ?? '');
+  const vpnRow = useMemo(
+    () => (isVpnRow && dbInbound ? vpnRowFromRecord(dbInbound) : null),
+    [isVpnRow, dbInbound],
+  );
 
   const isWireguard = !!dbInbound?.isWireguard;
   const wgSecretKey = inbound?.settings?.secretKey as string | undefined;
@@ -1322,6 +1334,18 @@ export default function InboundInfoModal({
     tabItems.push({ key: 'client', label: t('pages.inbounds.client'), children: clientTab });
   }
   tabItems.push({ key: 'inbound', label: t('pages.xray.rules.inbound'), children: inboundTab });
+  if (vpnRow) {
+    tabItems.push({
+      key: 'accounts',
+      label: t('pages.vpnProtocols.accounts'),
+      children: <ProtocolAccountsCard inbound={vpnRow} />,
+    });
+    tabItems.push({
+      key: 'tools',
+      label: t('pages.vpnProtocols.toolbox'),
+      children: <ProtocolToolboxContent inbound={vpnRow} />,
+    });
+  }
 
   return (
     <Modal

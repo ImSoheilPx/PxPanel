@@ -44,7 +44,8 @@ import {
 } from '@/schemas/forms/inbound-form';
 import { FormField, rhfZodValidate } from '@/components/form/rhf';
 import { Protocols, TRAFFIC_RESETS } from '@/schemas/primitives';
-import { VPN_PROTOCOLS, isVpnProtocol, type VpnProtocol } from '@/schemas/api/vpn';
+import { VPN_PROTOCOLS, isVpnProtocol } from '@/schemas/api/vpn';
+import { coerceInboundJsonField } from '@/models/dbinbound';
 import { SockoptStreamSettingsSchema } from '@/schemas/protocols/stream/sockopt';
 import { HysteriaStreamSettingsSchema } from '@/schemas/protocols/stream/hysteria';
 import {
@@ -82,6 +83,7 @@ import {
   TunFields,
   TunnelFields,
   VlessFields,
+  VpnProtocolFields,
   WireguardFields,
 } from './protocols';
 import {
@@ -103,9 +105,6 @@ import type { DBInbound } from '@/models/dbinbound';
 import type { NodeRecord } from '@/api/queries/useNodesQuery';
 
 const PROTOCOL_OPTIONS = Object.values(Protocols).map((p) => ({ value: p, label: p }));
-// NativeSelect renders a flat option list, so the VPN section gets a disabled
-// header row as its visual grouping; the real entries follow it.
-const VPN_PROTOCOL_GROUP_SENTINEL = '__vpn-protocols__';
 const SHARE_ADDR_STRATEGIES = ['node', 'listen', 'custom'] as const;
 const SHARE_ADDR_HOSTNAME_RE =
   /^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$/;
@@ -198,13 +197,6 @@ interface InboundFormModalProps {
   dbInbounds: DBInbound[];
   availableNodes?: NodeRecord[];
   availableNodesFetched?: boolean;
-  /**
-   * Set by the unified inbounds page: picking one of the VPN protocols in the
-   * add-mode protocol picker immediately hands off to the vpn-specific
-   * ProtocolInboundModal (this xray form cannot build those inbounds). When
-   * omitted the picker keeps its xray-only option list.
-   */
-  onVpnProtocolPicked?: (protocol: VpnProtocol) => void;
 }
 
 function buildAddModeValues(): InboundFormValues {
@@ -263,7 +255,6 @@ export default function InboundFormModal({
   dbInbounds,
   availableNodes,
   availableNodesFetched = true,
-  onVpnProtocolPicked,
 }: InboundFormModalProps) {
   const { t } = useTranslation();
   const uid = useId();
@@ -294,24 +285,18 @@ export default function InboundFormModal({
 
   const selectableNodes = (availableNodes || []).filter((n) => n.enable);
   const protocol = (useWatch({ control, name: 'protocol' }) ?? '') as string;
-  // Add-mode picker: xray protocols first, then (when the caller can handle
-  // them) a disabled "VPN Protocols" header followed by the vpn protocols —
-  // picking one delegates to ProtocolInboundModal via onVpnProtocolPicked.
-  const protocolOptions =
-    onVpnProtocolPicked && mode === 'add'
-      ? [
-          ...PROTOCOL_OPTIONS,
-          {
-            value: VPN_PROTOCOL_GROUP_SENTINEL,
-            label: t('pages.vpnProtocols.title'),
-            disabled: true,
-          },
-          ...VPN_PROTOCOLS.map((p) => ({
-            value: p,
-            label: t(`pages.vpnProtocols.protocolNames.${p}`),
-          })),
-        ]
-      : PROTOCOL_OPTIONS;
+  const isVpn = isVpnProtocol(protocol);
+  // One flat picker: xray protocols first, then the vpn protocols — the
+  // sentinel "VPN Protocols" header row is gone, the entries just follow.
+  // Listed in edit mode too, so the disabled select shows the protocol's
+  // display name instead of the raw value.
+  const protocolOptions = [
+    ...PROTOCOL_OPTIONS,
+    ...VPN_PROTOCOLS.map((p) => ({
+      value: p,
+      label: t(`pages.vpnProtocols.protocolNames.${p}`),
+    })),
+  ];
   const isNodeEligible = !!NODE_ELIGIBLE_PROTOCOLS[protocol];
   /*
    * The `node` share-address strategy only means something when the inbound can
@@ -330,7 +315,9 @@ export default function InboundFormModal({
   const network = (useWatch({ control, name: 'streamSettings.network' }) ?? '') as string;
   const security = (useWatch({ control, name: 'streamSettings.security' }) ?? 'none') as string;
   const streamEnabled = canEnableStream({ protocol });
-  const sniffingSupported = canEnableSniffing({ protocol });
+  // Vpn-protocol rows are served by their own daemons, not xray: no transport,
+  // no security and no sniffing tab — exactly like native non-xray protocols.
+  const sniffingSupported = !isVpn && canEnableSniffing({ protocol });
   /*
    * Wireguard (always a UDP listener) and Tunnel (dokodemo-door) expose no
    * user-selectable transport — their stream tab is just sockopt, which is all
@@ -590,6 +577,15 @@ export default function InboundFormModal({
     const sub = methods.watch((_value, { name, type }) => {
       if (name !== 'protocol' || type !== 'change') return;
       const next = getV('protocol') as string;
+      // Vpn protocols carry no xray stream: their config lives entirely in the
+      // loose settings JSON rendered by VpnProtocolFields.
+      if (isVpnProtocol(next)) {
+        setV('settings', {});
+        setV('streamSettings', undefined);
+        setV('nodeId', null);
+        setV('disableFlow', false);
+        return;
+      }
       const settings = createDefaultInboundSettings(next) ?? undefined;
       setV('settings', settings);
       if (!NODE_ELIGIBLE_PROTOCOLS[next]) {
@@ -634,10 +630,79 @@ export default function InboundFormModal({
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [mode, methods]);
 
+  /*
+   * Vpn-protocol inbounds share the standard save endpoints but their settings
+   * are a loose JSON blob (not the per-protocol xray schemas), so the
+   * InboundFormSchema parse below does not apply. Validate the basics, merge
+   * the form settings over the stored blob (preserving keys this form does not
+   * render, e.g. generated certificates) and POST the same envelope the vpn
+   * save path has always accepted.
+   */
+  const saveVpnValues = async (values: InboundFormValues) => {
+    const remark = String(values.remark ?? '').trim();
+    if (remark === '') {
+      setActiveTab('basic');
+      messageApi.error(t('pages.vpnProtocols.toasts.remarkRequired'));
+      return;
+    }
+    const port = Number(values.port ?? 0);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      setActiveTab('basic');
+      messageApi.error(t('pages.vpnProtocols.toasts.portRange'));
+      return;
+    }
+    setSaving(true);
+    try {
+      const editingId = mode === 'edit' ? (dbInbound?.id ?? 0) : 0;
+      const stored =
+        mode === 'edit' && dbInbound
+          ? (coerceInboundJsonField(dbInbound.settings) as Record<string, unknown>)
+          : { clients: [] };
+      const formSettings = { ...((values.settings ?? {}) as Record<string, unknown>) };
+      const rawRanges = Array.isArray(formSettings.ipRanges) ? formSettings.ipRanges : [];
+      formSettings.ipRanges = rawRanges.filter(
+        (range) => typeof range === 'string' && range.trim() !== '',
+      );
+      const payload = {
+        id: editingId,
+        enable: values.enable,
+        remark,
+        listen: values.listen ?? '',
+        port,
+        protocol: values.protocol,
+        expiryTime: values.expiryTime ?? 0,
+        total: values.total ?? 0,
+        tag: values.tag ?? '',
+        trafficReset: values.trafficReset ?? 'never',
+        trafficResetDay: values.trafficResetDay ?? 1,
+        preserveClientTraffic: values.preserveClientTraffic ?? false,
+        shareAddrStrategy: values.shareAddrStrategy ?? 'listen',
+        shareAddr: values.shareAddr ?? '',
+        subSortIndex: values.subSortIndex ?? 1,
+        excludeFromSub: values.excludeFromSub ?? false,
+        settings: { ...stored, ...formSettings },
+      };
+      const url = editingId ? `/panel/api/inbounds/update/${editingId}` : '/panel/api/inbounds/add';
+      const msg = await HttpUtil.post(url, payload, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (msg?.success) {
+        onSaved();
+        onClose();
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const saveValues = async () => {
     // settings.fallbacks has no bound field; shouldUnregister=false keeps it from
     // the reset object. An edit sends no clients: the server keeps the stored ones.
     const values = methods.getValues() as InboundFormValues;
+    if (isVpnProtocol(values.protocol)) {
+      await saveVpnValues(values);
+      return;
+    }
     const parsed = InboundFormSchema.safeParse(values);
     if (!parsed.success) {
       const issues = parsed.error.issues;
@@ -756,22 +821,7 @@ export default function InboundFormModal({
         </FormField>
       )}
 
-      <FormField
-        name="protocol"
-        label={t('pages.inbounds.protocol')}
-        onAfterChange={(value) => {
-          // A vpn protocol can't be built by this xray form: hand the choice
-          // to the caller, which swaps in ProtocolInboundModal.
-          if (
-            mode === 'add' &&
-            typeof value === 'string' &&
-            isVpnProtocol(value) &&
-            onVpnProtocolPicked
-          ) {
-            onVpnProtocolPicked(value);
-          }
-        }}
-      >
+      <FormField name="protocol" label={t('pages.inbounds.protocol')}>
         <NativeSelect id="protocol" disabled={mode === 'edit'} options={protocolOptions} />
       </FormField>
 
@@ -941,6 +991,13 @@ export default function InboundFormModal({
 
   const protocolTab = (
     <>
+      {isVpn && (
+        <VpnProtocolFields
+          protocol={protocol}
+          inboundId={mode === 'edit' ? (dbInbound?.id ?? null) : null}
+        />
+      )}
+
       {protocol === Protocols.WIREGUARD && (
         <WireguardFields wgPubKey={wgPubKey} regenInboundWg={regenInboundWg} />
       )}
@@ -1350,6 +1407,7 @@ export default function InboundFormModal({
                     Protocols.MASQUE,
                   ] as string[]
                 ).includes(protocol) ||
+                isVpn ||
                 isFallbackHost ||
                 fallbacks.length > 0
                   ? [

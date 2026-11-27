@@ -2,6 +2,13 @@ module github.com/ImSoheilPx/pxpanel
 
 go 1.27.1
 
+// toolchain pins the patch release CI installs (setup-go reads this directive
+// first). go1.27.1's stdlib carries 15 known-vulnerable symbols govulncheck
+// flags (net/http, crypto/x509, crypto/tls, html/template, os); all are fixed
+// by go1.27.4, the current patch release. The `go` directive above stays at
+// 1.27.1 so a host running go1.27.1 with GOTOOLCHAIN=local still builds.
+toolchain go1.27.4
+
 require (
 	github.com/Jipok/wgctrl-go v1.3.1
 	github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20261116

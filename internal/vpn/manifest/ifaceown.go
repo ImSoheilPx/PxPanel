@@ -62,8 +62,8 @@ var (
 	// amneziawgkern userspace driver) — so this shape is pxpanel's, not the
 	// vpn-ui "awg<id>" one. IFNAMSIZ: "pxpanel-awg" + up to 4 id digits fits
 	// the 15-char limit.
-	wgcNameRe  = regexp.MustCompile(`^wgc[0-9]+$`)
-	awgNameRe  = regexp.MustCompile(`^pxpanel-awg[0-9]+$`)
+	wgcNameRe = regexp.MustCompile(`^wgc[0-9]+$`)
+	awgNameRe = regexp.MustCompile(`^pxpanel-awg[0-9]+$`)
 
 	// vpnOutCarrierNameRe matches vpnOutCarrierDev's normal form: xcar<8 hex>.
 	vpnOutCarrierNameRe = regexp.MustCompile(`^xcar[0-9a-f]{8}$`)

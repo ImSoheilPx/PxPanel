@@ -431,6 +431,7 @@ function VpnTunnelModal({
         <Form.Item
           name="tag"
           label="Tag"
+          tooltip={t('pages.vpnOutbounds.tagHint')}
           rules={[
             { required: true, message: t('pages.vpnOutbounds.toasts.tagRequired') },
             {
@@ -443,20 +444,34 @@ function VpnTunnelModal({
         >
           <Input disabled={Boolean(values?.tag && existingTags.includes(values.tag))} />
         </Form.Item>
-        <Form.Item name="kind" label={t('pages.vpnOutbounds.kind')} rules={[{ required: true }]}>
+        <Form.Item
+          name="kind"
+          label={t('pages.vpnOutbounds.kind')}
+          tooltip={t('pages.vpnOutbounds.kindHint')}
+          rules={[{ required: true }]}
+        >
           <Select options={kindOptions} placeholder={t('pages.vpnOutbounds.pickKind')} />
         </Form.Item>
-        <Form.Item name="remark" label={t('remark')}>
+        <Form.Item name="remark" label={t('remark')} tooltip={t('pages.vpnOutbounds.remarkHint')}>
           <Input />
         </Form.Item>
-        <Form.Item name="via" label={t('pages.vpnOutbounds.via')}>
+        <Form.Item
+          name="via"
+          label={t('pages.vpnOutbounds.via')}
+          tooltip={t('pages.vpnOutbounds.viaHint')}
+        >
           <Select
             allowClear
             options={existingTags.map((tag) => ({ value: tag, label: tag }))}
             placeholder={t('pages.vpnOutbounds.viaHint')}
           />
         </Form.Item>
-        <Form.Item name="enable" label={t('enable')} valuePropName="checked">
+        <Form.Item
+          name="enable"
+          label={t('enable')}
+          tooltip={t('pages.vpnOutbounds.enableHint')}
+          valuePropName="checked"
+        >
           <Switch />
         </Form.Item>
         <Form.Item
@@ -500,26 +515,38 @@ function SshTunnelModal({
       destroyOnHidden
     >
       <Form form={form} layout="vertical" initialValues={values ?? undefined}>
-        <Form.Item name="tag" label="Tag" rules={[{ required: true }]}>
+        <Form.Item
+          name="tag"
+          label="Tag"
+          tooltip={t('pages.vpnOutbounds.tagHint')}
+          rules={[{ required: true }]}
+        >
           <Input />
         </Form.Item>
-        <Form.Item name="remark" label={t('remark')}>
+        <Form.Item name="remark" label={t('remark')} tooltip={t('pages.vpnOutbounds.remarkHint')}>
           <Input />
         </Form.Item>
         <Space size="middle" wrap>
           <Form.Item
             name="address"
             label={t('pages.vpnOutbounds.address')}
+            tooltip={t('pages.vpnOutbounds.addressHint')}
             rules={[{ required: true }]}
           >
             <Input style={{ width: 200 }} />
           </Form.Item>
-          <Form.Item name="port" label={t('pages.vpnProtocols.port')} rules={[{ required: true }]}>
+          <Form.Item
+            name="port"
+            label={t('pages.vpnProtocols.port')}
+            tooltip={t('pages.vpnOutbounds.portHint')}
+            rules={[{ required: true }]}
+          >
             <InputNumber min={1} max={65535} />
           </Form.Item>
           <Form.Item
             name="username"
             label={t('pages.vpnOutbounds.username')}
+            tooltip={t('pages.vpnOutbounds.usernameHint')}
             rules={[{ required: true }]}
           >
             <Input style={{ width: 160 }} />
@@ -528,6 +555,7 @@ function SshTunnelModal({
         <Form.Item
           name="authType"
           label={t('pages.vpnOutbounds.authType')}
+          tooltip={t('pages.vpnOutbounds.authTypeHint')}
           rules={[{ required: true }]}
         >
           <Select
@@ -541,15 +569,27 @@ function SshTunnelModal({
           {({ getFieldValue }) =>
             getFieldValue('authType') === 'privateKey' ? (
               <>
-                <Form.Item name="privateKey" label={t('pages.vpnOutbounds.privateKey')}>
+                <Form.Item
+                  name="privateKey"
+                  label={t('pages.vpnOutbounds.privateKey')}
+                  tooltip={t('pages.vpnOutbounds.privateKeyHint')}
+                >
                   <Input.TextArea rows={5} />
                 </Form.Item>
-                <Form.Item name="passphrase" label={t('pages.vpnOutbounds.passphrase')}>
+                <Form.Item
+                  name="passphrase"
+                  label={t('pages.vpnOutbounds.passphrase')}
+                  tooltip={t('pages.vpnOutbounds.passphraseHint')}
+                >
                   <Input.Password />
                 </Form.Item>
               </>
             ) : (
-              <Form.Item name="password" label={t('password')}>
+              <Form.Item
+                name="password"
+                label={t('password')}
+                tooltip={t('pages.vpnOutbounds.passwordHint')}
+              >
                 <Input.Password />
               </Form.Item>
             )

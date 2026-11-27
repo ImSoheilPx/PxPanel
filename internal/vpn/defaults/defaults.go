@@ -583,6 +583,14 @@ func NormalizeInboundSettings(inbound *model.Inbound) error {
 		return err
 	}
 	inbound.Settings = filled
+	// A nil hook is "no server-side validation yet" (the controllers wave wires
+	// it), not a crash: calling a nil func var here took the whole inbound ADD
+	// path down with a nil-pointer panic in every binary that had not linked a
+	// registering package. Defaults are still filled above, so the caller stores
+	// the same complete shape either way.
+	if ValidateSettings == nil {
+		return nil
+	}
 	return ValidateSettings(inbound.Protocol, inbound.Settings)
 }
 

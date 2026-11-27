@@ -99,18 +99,23 @@ func (noopBundle) ExtractStrongswanBundle() error   { return nil }
 func (noopBundle) LinkStrongswanIpsecDir() error    { return nil }
 func (noopBundle) StrongswanDefaultConfDir() string { return "" }
 
+// The active provider always carries the legacy-layout fallback (see
+// legacybundle.go): the real bundle answers first, then the previous panel
+// generation's locations, then distro PATH.
 var (
 	bundleMu sync.Mutex
-	bundle   BundleProvider = noopBundle{}
+	bundle   BundleProvider = wrapLegacy(noopBundle{})
 )
 
 // SetBundleProvider installs the daemon-bundle layer. Call once at startup,
-// before any Init* provisioning runs.
+// before any Init* provisioning runs. The provider is chained behind the
+// legacy-layout fallback, so a real bundle simply wins over the adopted
+// previous-generation daemons wherever it has an answer.
 func SetBundleProvider(b BundleProvider) {
 	bundleMu.Lock()
 	defer bundleMu.Unlock()
 	if b != nil {
-		bundle = b
+		bundle = wrapLegacy(b)
 	}
 }
 

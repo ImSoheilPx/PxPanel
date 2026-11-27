@@ -120,6 +120,10 @@ export function useVpnCoreMutations() {
       HttpUtil.post('/panel/api/core/provision', { cores: cores.join(',') }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: keys.vpn.core.provision() });
+      // Install state changes with every provision run, and the Core Settings
+      // page drives its per-core Install buttons and the provision picker off
+      // the catalog's installed flags.
+      void queryClient.invalidateQueries({ queryKey: keys.vpn.core.catalog() });
     },
   });
 
@@ -131,6 +135,7 @@ export function useVpnCoreMutations() {
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: keys.vpn.core.uninstall() });
+      void queryClient.invalidateQueries({ queryKey: keys.vpn.core.catalog() });
     },
   });
 

@@ -2,6 +2,7 @@ package vpnout
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/ssh"
 	"testing"
@@ -10,6 +11,33 @@ import (
 
 	"github.com/goccy/go-json"
 )
+
+// pinCoreHasTunInbound pins the runtime core-capability gate for one test. The
+// var exists for exactly this ("tests on a core-less host can pin the answer"):
+// a CI or dev host without the core binary at bin/ cannot run the probe at all —
+// xray.CheckConfig writes its scratch config next to the binary, so it fails with
+// a filesystem error that the gate would misreport as "the core refused a tun
+// inbound". These tests pin the carrier-RESOLUTION logic, not what the host's
+// core happens to support.
+func pinCoreHasTunInbound(t *testing.T) {
+	t.Helper()
+	prev := vpnOutCoreHasTunInbound
+	vpnOutCoreHasTunInbound = func() (bool, string) { return true, "" }
+	t.Cleanup(func() {
+		vpnOutCoreHasTunInbound = prev
+		dropTunProbeCache()
+	})
+	dropTunProbeCache()
+}
+
+// dropTunProbeCache resets the once-guard so the next resolution consults
+// whatever vpnOutCoreHasTunInbound currently holds rather than an answer cached
+// from the real (or previously pinned) probe.
+func dropTunProbeCache() {
+	vpnOutTunProbeOnce = sync.Once{}
+	vpnOutTunProbeOK = false
+	vpnOutTunProbeWhy = ""
+}
 
 // pinDevAddr says which device holds which address, so the sendThrough lookup can be
 // tested without depending on the devices this build host happens to have.
@@ -35,6 +63,11 @@ func carrierObs(t *testing.T, raw string) []map[string]any {
 // are the part an operator reads.
 func TestVpnOutCarrierFor(t *testing.T) {
 	pinAnyIface(t)
+	// The "any other outbound" subtest resolves a BRIDGED carrier, which consults
+	// the runtime core-capability gate. This host has no core binary, so the real
+	// probe cannot run; the gate is pinned available, which is the shape the
+	// resolution logic is written against.
+	pinCoreHasTunInbound(t)
 	tunnels := []VpnOutboundConfig{
 		{Tag: "wg-a", Kind: VpnOutWireguard, Enable: true, Iface: "wg0"},
 		{Tag: "off", Kind: VpnOutWireguard, Enable: false, Iface: "wg1"},

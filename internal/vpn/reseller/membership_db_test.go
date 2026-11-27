@@ -319,7 +319,9 @@ func TestDropInboundRefundsWhenTheLastMembershipGoes(t *testing.T) {
 // half-applied cascade leaves live accounts whose ledger rows are already gone.
 func TestCascadeRefusesWithoutTheSeam(t *testing.T) {
 	RemoveClientFromInbound = nil
-	t.Cleanup(withFakeSeam)
+	// Restore the wired seam when the test ends; t.Cleanup takes a func(), so the
+	// fixture helper (which needs t) is wrapped rather than passed bare.
+	t.Cleanup(func() { withFakeSeam(t) })
 	f := newMembershipFixture(t, model.ResellerProfile{AllowanceBytes: 100 * gb, SpentBytes: 10 * gb}, 10*gb)
 	caller := accounts.Viewer{Id: f.admin.Id, IsSuperAdmin: true}
 	if _, err := DeleteReseller(caller, f.reseller.Id, DeleteModeCascade); !errors.Is(err, ErrInboundPlaneUnavailable) {

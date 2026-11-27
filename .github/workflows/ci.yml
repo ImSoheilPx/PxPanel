@@ -43,7 +43,9 @@ jobs:
       - name: Test
         run: |
           go list ./... | grep -v '/frontend/node_modules/' > /tmp/go-packages.txt
-          go test -shuffle=on -count=1 $(cat /tmp/go-packages.txt)
+          # Same timeout as the race job (internal/web/service is the slow one); a
+          # hung test fails at 25m with a goroutine dump instead of eating the job.
+          go test -shuffle=on -count=1 -timeout 25m $(cat /tmp/go-packages.txt)
 
   postgres-durable-first:
     runs-on: ubuntu-latest

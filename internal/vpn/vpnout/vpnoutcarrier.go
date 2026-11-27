@@ -1100,14 +1100,21 @@ type VpnOutCarriable interface {
 //
 // A device carrier never refuses: steering into a netdev is L4-agnostic, so GRE and
 // ESP travel as happily as TCP. Only a bridged carrier asks the question, and only
-// the driver can answer it.
+// the driver can answer it — which is why a kind with NO driver on this build (the
+// pptp/l2tp client waves have not landed) must fail CLOSED here: nobody can vouch
+// that its outer transport is TCP/UDP-only, and PPTP's data channel is raw GRE, the
+// exact frame a bridged carrier drops. Accepting it would ship a tunnel that
+// authenticates, reports itself up, and moves nothing.
 func vpnOutCarrierRefusal(cfg VpnOutboundConfig, c vpnOutCarrier) string {
 	if !c.Bridged() {
 		return ""
 	}
 	d, err := vpnOutDriverFor(cfg.Kind)
 	if err != nil {
-		return ""
+		return fmt.Sprintf("%s cannot be carried by the %q outbound: this build has no %s "+
+			"outbound driver, so whether its traffic survives a TCP/UDP-only carrier cannot "+
+			"be checked; name a tunnel, or a freedom outbound with an Interface Name or "+
+			"sendThrough, as the carrier instead", cfg.Tag, c.Tag, cfg.Kind)
 	}
 	ask, ok := d.(VpnOutCarriable)
 	if !ok {

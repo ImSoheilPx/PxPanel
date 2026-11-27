@@ -1,0 +1,90 @@
+/* Core Settings page carries its own copy of the standard panel page shell
+   (page background, transparent layout, content padding, summary-card padding,
+   card radius/shadows), mirroring page-shell.css/page-cards.css for the other
+   panel pages. Kept page-scoped like SettingsPage.css/XrayPage.css so the
+   shared theme stylesheets stay untouched. */
+
+.core-settings-page {
+  --bg-page: #e6e8ec;
+  --bg-card: #ffffff;
+  min-height: 100vh;
+  background: var(--bg-page);
+}
+
+.core-settings-page.is-dark {
+  --bg-page: #1a1b1f;
+  --bg-card: #23252b;
+}
+
+.core-settings-page.is-dark.is-ultra {
+  --bg-page: #000;
+  --bg-card: #101013;
+}
+
+.core-settings-page .ant-layout,
+.core-settings-page .ant-layout-content,
+.core-settings-page .content-shell {
+  background: transparent;
+}
+
+.core-settings-page .content-area {
+  padding: 24px;
+}
+
+.core-settings-page .summary-card {
+  padding: 16px;
+}
+
+.core-settings-page .toolbar {
+  margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.core-settings-page .ant-card {
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.25s ease,
+    border-color 0.2s ease;
+}
+
+.core-settings-page.is-dark .ant-card {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.core-settings-page.is-dark.is-ultra .ant-card {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.core-settings-page .ant-card.ant-card-hoverable:hover {
+  cursor: default;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+.core-settings-page.is-dark .ant-card.ant-card-hoverable:hover {
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.core-settings-page.is-dark.is-ultra .ant-card.ant-card-hoverable:hover {
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+@media (max-width: 768px) {
+  .core-settings-page .content-area,
+  .core-settings-page .summary-card {
+    padding: 8px;
+  }
+}

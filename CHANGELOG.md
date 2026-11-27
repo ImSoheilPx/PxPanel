@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.2
+
+- Inbound form unification: VPN protocols are now configured inside the standard Add/Modify Inbound dialog (same tabs and Basics fields, per-field tooltips); the separate VPN dialog was removed and the protocol picker no longer shows a group-sentinel item.
+- Inbound row actions for VPN protocols now match the native set exactly: Inbound Information, Export Inbound, Reset Traffic, Clone, Delete; bulk delete now settles VPN accounts and the reseller ledger per inbound; VPN inbound clones re-allocate fresh address ranges.
+- Routing: panel xray routing rules now apply to all VPN protocol traffic (single nftables steering registry; OpenVPN/OpenConnect registered; SSH hostname passthrough pinned by tests). MTProto egresses directly by protocol design.
+- Core Settings redesigned to the standard page structure with localized status tags, per-core Install buttons and tooltips; daemons installed by previous releases (legacy /opt/pxpanel and /usr/libexec/pxpanel-* layouts) are detected and adopted automatically.
+- CI hardening: fixed go-test/race/golangci/codegen/govulncheck failures (ctl test deadlock, migration model sync, nil-hook guards, Go toolchain 1.27.4, regenerated API schemas); frontend lint (34) and locale parity issues resolved.
+- Tooltips added across Admins, Resellers, VPN Outbounds and Core Settings.
+
 ## 1.0.1
 
 - VPN Protocols page merged into the Inbounds page (unified list, vpn-specific row actions, add-inbound flow); the separate page and menu entry were removed.

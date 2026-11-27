@@ -1,5 +1,6 @@
 export { default as TunFields } from './tun';
 export { default as TunnelFields } from './tunnel';
+export { default as VpnProtocolFields } from './vpn';
 export { default as ShadowsocksFields } from './shadowsocks';
 export { default as WireguardFields } from './wireguard';
 export { default as HysteriaFields } from './hysteria';

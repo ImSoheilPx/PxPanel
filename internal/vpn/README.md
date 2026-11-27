@@ -317,3 +317,55 @@ transport is not a plain TCP/UDP flow the core could re-emit). The web layer
 deliberately excludes mtproto from `InjectPairedInbounds` (vpn-ui paired a
 telemt socks inbound; this panel's mtproto plane is `internal/mtproto`).
 Route MTProto with the sidecar's own egress controls, not routing rules.
+
+## Legacy daemon adoption (v1.0.2 wave-B3)
+
+A host upgraded from the PREVIOUS panel generation still has its daemon bundle
+on disk — flat daemons in `/opt/pxpanel/bin` (next to the old executable) and
+the relocatable accel-ppp / strongSwan / pppd trees under
+`/usr/libexec/pxpanel-accel`, `/usr/libexec/pxpanel-strongswan`,
+`/usr/libexec/pxpanel`. Those daemons work, but neither the recorded
+provisioned set nor the bundle seam knew them, so every daemon-backed core
+read `not_installed` after the upgrade.
+
+Adoption is RESOLUTION-SIDE, not filesystem-side (`procmgr/legacybundle.go`):
+
+- `procmgr.LegacyLayout` / `SetLegacyLayout` describe the old locations
+  (TEST-ONLY setter, the `manifest.SetManifestPath` pattern). The active
+  BundleProvider is always a `legacyAwareBundle`: real bundle answer first,
+  then the legacy layout, then distro PATH — the same order in
+  `daemonBin`, `bundledDaemonBin`, and coresettings' `daemonInstalled` /
+  `daemonVersion`. Nothing is copied or symlinked into the new layout: the
+  relocatable trees are patchelf'd loader-wrapper launchers whose compiled-in
+  paths only resolve in place.
+- The relocatable trees are adopted via the existing seam methods
+  (`AccelBinPath`, `StrongswanBinPath`, `HasStrongswanBundle`,
+  `StrongswanBundleRoot/Ready/DefaultConfDir`), so charon and accel-pppd keep
+  launching exactly as the old install launched them — through their tree's
+  musl loader wrappers — with procmgr's existing launch mechanics. The pppd
+  tree keeps the old rule (`UsingBundledPppd`): use it only when the host has
+  no system pppd, except through our own `/usr/sbin/pppd` symlink. The
+  libreswan/pluto bundle family is deliberately NOT adopted (no evidence of it
+  on upgraded hosts; claiming it would wrongly gate the distro ipsec.service
+  teardown).
+- Two compiled-in-path symlinks the old provisioning maintained are repaired
+  CREATE-ONLY when missing (`procmgr.RepairLegacyLinks`, manifest-recorded via
+  `manifest.PrepareSymlink`): pptpd's compiled-in pptpctrl path and charon's
+  compiled-in `/usr/lib/ipsec` lib+plugin dir. An existing symlink or real
+  file is never touched.
+- The one-time record lives in coresettings (`legacyadopt.go`), hooked at the
+  single choke point every installed-set consumer shares
+  (`provisionedProtocolSet`, plus `IsProvisioned`): the first read after the
+  DB is wired runs `procmgr.DetectLegacyCores()` (boot: the ownership survey;
+  UI: the first Core Settings render), adds the found cores ADDITIVELY to the
+  recorded `provisionedProtocols`, sets `vpnProvisioned`, and writes the
+  `legacyDaemonsAdopted` run-once flag (written LAST, so a failed write
+  retries the idempotent scan on the next boot instead of skipping adoption
+  forever). After the flag is set the scan never runs again — an uninstall
+  cannot be undone by a reboot, and a clean host's first scan is a no-op.
+- Consequence on an upgraded host: Core Settings shows the adopted cores
+  installed (idle without inbounds) with versions probed through the same
+  seams, Init*/Provision start the adopted daemons via `DaemonBin`, and
+  Provision remains available for genuinely missing daemons (the bundle wave's
+  future provider, once wired through `SetBundleProvider`, simply wins over
+  the legacy layout wherever it has an answer).

@@ -17,6 +17,7 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -240,28 +241,32 @@ export default function AdminsPage() {
           cancelText={t('cancel')}
         >
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
-            <Select
-              style={{ width: '100%' }}
-              placeholder={t('pages.admins.reassignFrom')}
-              aria-label={t('pages.admins.reassignFrom')}
-              value={reassignFrom}
-              onChange={setReassignFrom}
-              options={admins.map((admin) => ({
-                value: admin.id,
-                label: `${admin.username} (${admin.inboundCount})`,
-              }))}
-            />
-            <Select
-              style={{ width: '100%' }}
-              placeholder={t('pages.admins.reassignTo')}
-              aria-label={t('pages.admins.reassignTo')}
-              value={reassignTo}
-              onChange={setReassignTo}
-              options={admins.map((admin) => ({
-                value: admin.id,
-                label: admin.username,
-              }))}
-            />
+            <Tooltip title={t('pages.admins.reassignFromHint')}>
+              <Select
+                style={{ width: '100%' }}
+                placeholder={t('pages.admins.reassignFrom')}
+                aria-label={t('pages.admins.reassignFrom')}
+                value={reassignFrom}
+                onChange={setReassignFrom}
+                options={admins.map((admin) => ({
+                  value: admin.id,
+                  label: `${admin.username} (${admin.inboundCount})`,
+                }))}
+              />
+            </Tooltip>
+            <Tooltip title={t('pages.admins.reassignToHint')}>
+              <Select
+                style={{ width: '100%' }}
+                placeholder={t('pages.admins.reassignTo')}
+                aria-label={t('pages.admins.reassignTo')}
+                value={reassignTo}
+                onChange={setReassignTo}
+                options={admins.map((admin) => ({
+                  value: admin.id,
+                  label: admin.username,
+                }))}
+              />
+            </Tooltip>
           </Space>
         </Modal>
       </Layout>
@@ -337,6 +342,7 @@ function AdminFormModal({
           <Form.Item
             name="username"
             label={t('pages.admins.username')}
+            tooltip={t('pages.admins.usernameHint')}
             rules={[{ required: true }]}
           >
             <Input style={{ width: 200 }} />
@@ -344,20 +350,31 @@ function AdminFormModal({
           <Form.Item
             name="password"
             label={t('password')}
+            tooltip={t('pages.admins.passwordHint')}
             extra={admin ? t('pages.admins.passwordKeepHint') : undefined}
             rules={admin ? [] : [{ required: true }]}
           >
             <Input.Password style={{ width: 200 }} />
           </Form.Item>
-          <Form.Item name="nickname" label={t('pages.resellers.nickname')}>
+          <Form.Item
+            name="nickname"
+            label={t('pages.resellers.nickname')}
+            tooltip={t('pages.admins.nicknameHint')}
+          >
             <Input style={{ width: 160 }} />
           </Form.Item>
-          <Form.Item name="enable" label={t('enable')} valuePropName="checked">
+          <Form.Item
+            name="enable"
+            label={t('enable')}
+            tooltip={t('pages.admins.enableHint')}
+            valuePropName="checked"
+          >
             <Switch />
           </Form.Item>
           <Form.Item
             name="isSuperAdmin"
             label={t('pages.admins.superAdmin')}
+            tooltip={t('pages.admins.superAdminHint')}
             valuePropName="checked"
           >
             <Switch />
@@ -382,7 +399,11 @@ function AdminFormModal({
                     }))}
                   />
                 </Form.Item>
-                <Form.Item name="inboundIds" label={t('pages.admins.inboundAccess')}>
+                <Form.Item
+                  name="inboundIds"
+                  label={t('pages.admins.inboundAccess')}
+                  tooltip={t('pages.admins.inboundAccessHint')}
+                >
                   <Select
                     mode="multiple"
                     allowClear

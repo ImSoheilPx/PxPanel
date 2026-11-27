@@ -64,6 +64,17 @@ func migrationModels() []any {
 		&model.TuicTrafficReceipt{},
 		&model.ClientTrafficWindow{},
 		&model.ClientChangeLog{},
+		// VPN protocol stack (same models allModels() carries). Kept after the
+		// panel tables and in dependency order: Account before AccountInbound,
+		// User/Inbound before the tables that name them. The columns are plain
+		// ints with indexes (no DB-level FK constraints), so the order is about
+		// readability and sequence resync, not constraint creation order.
+		&model.Account{},
+		&model.AccountInbound{},
+		&model.InboundAccess{},
+		&model.ResellerProfile{},
+		&model.ResellerClient{},
+		&model.CustomGeoResource{},
 	}
 }
 

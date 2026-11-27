@@ -1213,24 +1213,6 @@ export interface Setting {
   value: string;
 }
 
-export interface Sponsor {
-  enable?: boolean | null;
-  from?: string | null;
-  id: string;
-  link: string;
-  logo?: string;
-  name: string;
-  slots: string[];
-  text: Record<string, string>;
-  title: Record<string, string>;
-  until: string;
-}
-
-export interface SponsorList {
-  contact?: string;
-  sponsors: Sponsor[];
-}
-
 export interface Status {
   amneziawg: unknown;
   appStats: unknown;
