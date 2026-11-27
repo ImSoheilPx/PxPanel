@@ -36,7 +36,14 @@ async function fetchAdminInbounds(): Promise<InboundBrief[]> {
 
 export function useVpnAdminsQuery() {
   const query = useQuery({ queryKey: keys.vpn.admins.list(), queryFn: fetchAdmins });
-  return { admins: query.data ?? [], loading: query.isFetching, refetch: query.refetch, fetched: query.isSuccess, fetchError: query.error instanceof Error ? query.error.message : query.error ? String(query.error) : null };
+  return {
+    admins: query.data ?? [],
+    loading: query.isFetching,
+    refetch: query.refetch,
+    fetched: query.isSuccess,
+    fetchError:
+      query.error instanceof Error ? query.error.message : query.error ? String(query.error) : null,
+  };
 }
 
 export function useVpnPermissionsQuery() {

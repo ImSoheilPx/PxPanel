@@ -20,6 +20,7 @@ import (
 
 	"github.com/ImSoheilPx/pxpanel/internal/database/model"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn"
+	"github.com/ImSoheilPx/pxpanel/internal/vpn/nftables"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/procmgr"
 	vpnrange "github.com/ImSoheilPx/pxpanel/internal/vpn/range"
 )
@@ -30,6 +31,15 @@ import (
 func Register() {
 	vpn.RegisterProtocolEvictor("openconnect", evictRegisteredIP)
 	vpn.RegisterSubnetResolver("openconnect", ocservSubnetsForInbound)
+	// Shared-ruleset steering (vpn-ui nftables.go OpenConnect TPROXY loop —
+	// ocservCIDRs + c2c/cross + the 12300+id dokodemo port). Registering here
+	// means ANY protocol's regeneration that gathers through
+	// nftables.GatherRulesInput keeps OpenConnect's TPROXY rules live — and
+	// OpenConnect's own SetupRouting gathers the same way, so it keeps everyone
+	// else's. Wire-up order guarantees this runs before the first
+	// regeneration: RegisterVpnProtocols (web.go) runs before the WireVpnStack
+	// Init* sequence, and the Nets func reads the DB lazily at gather time.
+	nftables.RegisterSteeringSource("openconnect", nftables.SteeringSource{Nets: (&OcservService{}).nftSteeringNets})
 }
 
 // evictRegisteredIP is the EvictProtocolIP seam: find whichever running ocserv

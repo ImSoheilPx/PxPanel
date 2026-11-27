@@ -96,8 +96,7 @@ export function useVpnOutboundMutations() {
   });
 
   const delMut = useMutation({
-    mutationFn: (tag: string) =>
-      HttpUtil.post('/panel/api/xray/vpnoutbound/delete', { tag }),
+    mutationFn: (tag: string) => HttpUtil.post('/panel/api/xray/vpnoutbound/delete', { tag }),
     onSuccess: (msg) => {
       if (msg?.success) invalidate();
     },
@@ -140,8 +139,7 @@ export function useSshOutboundMutations() {
   });
 
   const delMut = useMutation({
-    mutationFn: (tag: string) =>
-      HttpUtil.post('/panel/api/xray/sshoutbound/delete', { tag }),
+    mutationFn: (tag: string) => HttpUtil.post('/panel/api/xray/sshoutbound/delete', { tag }),
     onSuccess: (msg) => {
       if (msg?.success) invalidate();
     },

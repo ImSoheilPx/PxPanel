@@ -111,7 +111,7 @@ export default function ProtocolToolboxModal({ inbound, onClose }: Props) {
         />
       ) : (
         inbound && (
-          <Spin spinning={addressingQuery.isFetching}>
+          <Spin spinning={addressingQuery.isFetching} aria-live="off">
             {OVPN_PROTOCOLS.has(inbound.protocol) && (
               <Card
                 size="small"
@@ -136,6 +136,7 @@ export default function ProtocolToolboxModal({ inbound, onClose }: Props) {
               >
                 <Space wrap>
                   <Input
+                    aria-label={t('pages.vpnProtocols.email')}
                     placeholder={t('pages.vpnProtocols.email')}
                     value={configEmail}
                     onChange={(e) => setConfigEmail(e.target.value)}
@@ -226,14 +227,12 @@ function ClientConfigFetchButton({
     email,
   );
 
-  const entries: DeviceConfigEntry[] = data ?? [];
-
   const onSave = useCallback(() => {
-    entries.forEach((entry, index) => {
+    (data ?? []).forEach((entry, index) => {
       const text = deviceConfigText(entry);
       if (text) downloadText(`${email}-${index}.conf`, text);
     });
-  }, [entries, email]);
+  }, [data, email]);
 
   return (
     <Button loading={isFetching} disabled={!enabled || !data} onClick={onSave}>
@@ -248,7 +247,5 @@ function UserLimitText({ report }: { report: AddressingReport }) {
   if (posted === null || posted === undefined) {
     return <span>{`${report.userLimit.effective} (${rule})`}</span>;
   }
-  return (
-    <span>{`${posted} → ${report.userLimit.effective} (${rule})`}</span>
-  );
+  return <span>{`${posted} → ${report.userLimit.effective} (${rule})`}</span>;
 }

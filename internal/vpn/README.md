@@ -220,7 +220,7 @@ the shared charon/libreswan layer). One `pptpd` serves every PPTP inbound; one
 | `internal/vpn/configedit` | `web/service/coreconfig.go` (storage+merge+apply half) | The operator config-override seam every generator merges through (`ApplyOverride`/`Merge`); the editor endpoints + file catalog are the core wave's. |
 | `internal/vpn/protoval` | `web/service/protocolvalidate.go` (framework + l2tp/pptp entries) | The per-protocol settings-validator registry + shared checks (L2TP/PPTP registered from init). Wire-up: `defaults.ValidateSettings = protoval.Validate` at boot (single var, no per-wave clobber). |
 | `internal/vpn/radius/radcli.go` | `web/service/radius.go` radcli block | `GenerateRadiusClientConfig` + dictionary + `CleanupLegacyPerInboundFiles` — the pppd radius.so client configs pointing at the in-binary RADIUS server. |
-| `internal/vpn/nftables/rulesinput.go` | (new seam) | Contributor registry replacing vpn-ui's `ApplyNftRules()` self-gather: each protocol wave registers one `RegisterRulesContributor` (l2tp adds the raw-L2TP input gate), the caller builds with `RulesInputFor()`. |
+| `internal/vpn/nftables/rulesinput.go` | (new seam) | LEGACY contributor registry (kept honoured by `GatherRulesInput` so nothing silently drops). The live seam is `steering.go`'s `RegisterSteeringSource` — all nine tunnel protocols register there (l2tp keeps its raw-L2TP input gate as its source's `ExtraInputRules`), and every regeneration builds with `GatherRulesInput()`. |
 
 Foundation extensions this wave made: `procmgr` — exported `PppdEnv`/`PptpdArgs`/
 `LinkPptpCtrl`/`Bundles` wrappers (DaemonBin/MigrateFromSystemd existed), and the
@@ -244,4 +244,76 @@ force-disconnect (`radius.RadiusService.PPPForceDisconnect`) through
   source-IP caps again, that is an in-core admission decision (see the old
   ip-limiter-plan.md), not a `web/job` port.
 
+## Xray routing plane — per-protocol flow and the no-drops steering rule
 
+How each protocol's client traffic reaches Xray (and therefore the operator's
+routing rules), and the two bugs that made the rules apply only to
+vless/vmess on v1.0.0:
+
+**Per-protocol traffic flow:**
+
+| Protocol | Kernel/termination half | Xray half | Operator routing rules |
+|---|---|---|---|
+| l2tp, l2tp/ipsec | xl2tpd assigns tunnel IPs; nftables TPROXY (src = client /24s) → mark 1 → policy table 100 → local | paired `dokodemo-door` 127.0.0.1:12300+id, tag = inbound tag, sniffing http,tls | IP rules on the original dst; domain rules via sniffed SNI/Host |
+| pptp | pptpd; same TPROXY | same dokodemo pairing | same |
+| openvpn | openvpn tun (10.2.x udp, 10.3.x tcp); same TPROXY | same | same |
+| openconnect | ocserv (10.4.x); same TPROXY | same | same |
+| sstp | accel-ppp (10.5.x); same TPROXY | same | same |
+| ikev2 | charon XFRM (10.6.x); same TPROXY (+MSS clamps) | same | same |
+| wg-c / awg | kernel wireguard/amneziawg (10.7.x/10.8.x); same TPROXY | same | same |
+| gre | FOU decap (10.9.x); same TPROXY (+anti-spoof, +MSS, +proto-47 gate) | same | same |
+| ssh | in-binary SSH gateway, no tunnel IP, no nftables | paired loopback `socks` :12300+id, UDP ASSOCIATE on, account = socks username | destination rules: hostname rides ATYP=domain (client-dependent), IP rules always; per-email rules match the socks username natively |
+| mtproto | v3 mtg sidecar terminates the protocol | **none — egresses directly** (deliberate; see below) | NOT steerable by Xray routing rules (sidecar egress controls instead) |
+
+**Root causes of the v1.0.0 "rules apply only to vless/vmess" report:**
+
+1. **Tunnel protocols — regenerations dropped other protocols' TPROXY
+   rules.** `ApplyNftRules` rebuilds the shared `vpn` table from exactly the
+   `RulesInput` it is handed. The port had TWO disjoint contributor
+   registries and only some protocols used the newer one: l2tp+pptp
+   registered in the legacy `RegisterRulesContributor` registry while
+   sstp/ikev2/wgc/awg/gre registered as `SteeringSource`s — and
+   `GatherRulesInput` flushed only the steering list, `RulesInputFor` only
+   the legacy list. openvpn and ocserv registered NOWHERE and their own
+   `SetupRouting` passed a self-only `RulesInput{Nets: …}`. So every
+   regeneration (any protocol's boot Init* or settings save) stripped at
+   least one other protocol's TPROXY steering: those clients kept their
+   tunnels up, but their packets left the host straight out the WAN — past
+   Xray, past every routing rule, past accounting — with a valid config and
+   a running core. Fix: one gather, total coverage — `GatherRulesInput`
+   flushes BOTH registries (legacy contributors first), `RulesInputFor`
+   delegates to it, l2tp/pptp migrated to `RegisterSteeringSource`
+   (rule text unchanged), openvpn/ocserv registered (`openvpn.Register()` /
+   `ocserv.Register()`) and switched to the full gather like their
+   sstp/ikev2 siblings. `nftables.RegisteredSteeringProtocols` +
+   `steering_registry_test.go` pin the no-drops contract over
+   `defaults.TunnelProtocols`.
+2. **SSH — nothing was actually broken in the relay; the visible failure was
+   client-side DNS.** The relay passes the direct-tcpip destination through
+   verbatim and `socksEncodeAddr` puts hostnames on the wire as ATYP=domain
+   (byte-identical to vpn-ui), so a domain rule matches whenever the SSH
+   client does not resolve locally; many tunneling apps DO resolve on the
+   device, and those flows carry a raw IP that only an IP rule can match.
+   The ported behaviour is now pinned by tests
+   (`ssh_socks_hostname_test.go`): hostname → ATYP=domain, IPv4 → 0x01,
+   IPv6 → 0x04, udpgw UDP is raw-IP by wire format. A domain-rule miss on
+   IP-sending clients is inherent to the SSH protocol, not a panel defect.
+
+**Routing-rule translation contract** (`xrayplane/routing.go`, wired in the
+web layer's `GetXrayConfig` VPN hook: outbound synthesis → paired inbounds →
+`TranslateVpnRoutingRules` → carrier bridges): destination rules pass through
+untouched (they already match every tag); per-email rules split into a source
+rule for pool clients (a dokodemo inbound has no user to match) while
+ssh/mtproto emails KEEP the user match (their account arrives as the socks
+username — translating a relay email to a source match would produce a rule
+that matches nothing); the 10.0.0.0/12 blackhole backstop is appended LAST
+behind every operator rule. Translation tests over a synthetic
+dokodemo+ssh+mtproto inbound set: `xrayplane/routing_vpntags_test.go`.
+
+**MTProto limitation (by design):** the v3 mtg sidecar terminates MTProto and
+egresses directly — xray routing cannot intercept it without breaking the
+protocol (middle-proxy RPC keys bind the egress IP+PORT, and the obfuscated
+transport is not a plain TCP/UDP flow the core could re-emit). The web layer
+deliberately excludes mtproto from `InjectPairedInbounds` (vpn-ui paired a
+telemt socks inbound; this panel's mtproto plane is `internal/mtproto`).
+Route MTProto with the sidecar's own egress controls, not routing rules.

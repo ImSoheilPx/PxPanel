@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Button, Modal, Select, Space, Spin, message } from 'antd';
 
@@ -22,24 +22,22 @@ export default function CoreConfigModal({ core, onClose }: Props) {
 
   const targets = useMemo(() => query.data?.targets ?? [], [query.data]);
   const [selected, setSelected] = useState('');
-  const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
   const [health, setHealth] = useState<string>('');
+  // The in-flight editor buffer, tagged with the target it was typed against.
+  const [edit, setEdit] = useState<{ label: string; text: string } | null>(null);
 
-  useEffect(() => {
-    if (!query.data) return;
-    const first = targets[0];
-    if (first && !targets.some((target) => targetLabel(target) === selected)) {
-      setSelected(targetLabel(first));
-    }
-  }, [query.data, targets, selected]);
-
-  useEffect(() => {
-    const current = targets.find((target) => targetLabel(target) === selected);
-    if (current) setText(current.Text ?? '');
-  }, [selected, targets]);
-
-  const current = targets.find((target) => targetLabel(target) === selected);
+  // Both derived during render instead of synced by effects: the stored label
+  // falls back to the first target when it no longer exists, and the textarea
+  // shows the fetched config until the user types against the current target.
+  const selectedLabel = targets.some((target) => targetLabel(target) === selected)
+    ? selected
+    : targets[0]
+      ? targetLabel(targets[0])
+      : '';
+  const current = targets.find((target) => targetLabel(target) === selectedLabel);
+  const text = edit && edit.label === selectedLabel ? edit.text : (current?.Text ?? '');
+  const setText = (value: string) => setEdit({ label: selectedLabel, text: value });
 
   const onSave = useCallback(async () => {
     if (!core || !current) return;
@@ -70,20 +68,14 @@ export default function CoreConfigModal({ core, onClose }: Props) {
         <Button key="reload" onClick={() => void query.refetch()}>
           {t('refresh')}
         </Button>,
-        <Button
-          key="save"
-          type="primary"
-          loading={saving}
-          disabled={!current}
-          onClick={onSave}
-        >
+        <Button key="save" type="primary" loading={saving} disabled={!current} onClick={onSave}>
           {t('save')}
         </Button>,
       ]}
       title={t('pages.core.configTitle', { core: core || '' })}
       width={960}
     >
-      <Spin spinning={query.isFetching}>
+      <Spin spinning={query.isFetching} aria-live="off">
         {targets.length === 0 && !query.isFetching ? (
           <Alert type="info" showIcon message={t('pages.core.noConfigTargets')} />
         ) : (
@@ -91,8 +83,9 @@ export default function CoreConfigModal({ core, onClose }: Props) {
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
               <Select
                 style={{ width: '100%' }}
-                value={selected || undefined}
+                value={selectedLabel || undefined}
                 onChange={setSelected}
+                aria-label={t('pages.core.config')}
                 options={targets.map((target) => ({
                   value: targetLabel(target),
                   label: targetDisplay(target),

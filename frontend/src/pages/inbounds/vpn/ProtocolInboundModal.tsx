@@ -1,16 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Alert,
-  Button,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Space,
-  Switch,
-  message,
-} from 'antd';
+import { Alert, Button, Form, Input, InputNumber, Modal, Space, Switch, message } from 'antd';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 
 import type { VpnProtocol } from '@/schemas/api/vpn';
@@ -135,32 +125,41 @@ export default function ProtocolInboundModal({ open, protocol, inbound, onClose 
   const { saveInbound, updateInbound, generateCert, checkIkev2Cert } = useVpnProtocolMutations();
   const editingId = inbound?.id ?? 0;
 
-  const [remark, setRemark] = useState('');
-  const [port, setPort] = useState<number>(0);
-  const [listen, setListen] = useState('');
-  const [enable, setEnable] = useState(true);
-  const [settings, setSettings] = useState<SettingsFormState>({});
+  // Initial values come from the mount-time props; re-seeding on later opens
+  // is handled by the seedKey adjustment below.
+  const [remark, setRemark] = useState(inbound?.remark ?? '');
+  const [port, setPort] = useState<number>(inbound?.port ?? 0);
+  const [listen, setListen] = useState(inbound?.listen ?? '');
+  const [enable, setEnable] = useState(inbound?.enable ?? true);
+  const [settings, setSettings] = useState<SettingsFormState>(
+    inbound ? { ...inbound.settings } : {},
+  );
   const [saving, setSaving] = useState(false);
   const [certWarning, setCertWarning] = useState('');
 
   // Seed from the inbound (or per-protocol defaults) each time the modal opens.
-  useEffect(() => {
-    if (!open) return;
-    setCertWarning('');
-    setRemark(inbound?.remark ?? '');
-    setPort(inbound?.port ?? 0);
-    setListen(inbound?.listen ?? '');
-    setEnable(inbound?.enable ?? true);
-    setSettings(inbound ? { ...inbound.settings } : {});
-  }, [open, inbound]);
+  // The form re-seeds during render when the open/protocol/inbound triple
+  // changes while open (the React "adjust state when a prop changes" pattern)
+  // instead of syncing state from an effect; the initial values come straight
+  // from the props the modal mounts with.
+  const seedKey = `${open}|${protocol}|${inbound?.id ?? 'new'}`;
+  const [seededKey, setSeededKey] = useState(seedKey);
+  if (seededKey !== seedKey) {
+    setSeededKey(seedKey);
+    if (open) {
+      setCertWarning('');
+      setRemark(inbound?.remark ?? '');
+      setPort(inbound?.port ?? 0);
+      setListen(inbound?.listen ?? '');
+      setEnable(inbound?.enable ?? true);
+      setSettings(inbound ? { ...inbound.settings } : {});
+    }
+  }
 
   const fields = PROTOCOL_FIELDS[protocol];
   const certKind = CERT_PATHS[protocol];
 
-  const ranges = useMemo(
-    () => (settings.ipRanges as string[] | undefined) ?? [],
-    [settings],
-  );
+  const ranges = useMemo(() => (settings.ipRanges as string[] | undefined) ?? [], [settings]);
 
   const setField = useCallback((key: string, value: unknown) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -220,9 +219,7 @@ export default function ProtocolInboundModal({ open, protocol, inbound, onClose 
     }
     setSaving(true);
     try {
-      const base: Record<string, unknown> = inbound
-        ? { ...inbound.settings }
-        : { clients: [] };
+      const base: Record<string, unknown> = inbound ? { ...inbound.settings } : { clients: [] };
       const payload: Record<string, unknown> = {
         id: editingId,
         enable,
@@ -282,25 +279,33 @@ export default function ProtocolInboundModal({ open, protocol, inbound, onClose 
     >
       <Form layout="vertical">
         <Space size="middle" wrap>
-          <Form.Item label={t('remark')} required>
+          <Form.Item label={t('remark')} required htmlFor="vpn-remark">
             <Input
+              id="vpn-remark"
               value={remark}
               onChange={(e) => setRemark(e.target.value)}
               style={{ width: 220 }}
             />
           </Form.Item>
-          <Form.Item label={t('pages.vpnProtocols.port')} required>
-            <InputNumber min={1} max={65535} value={port} onChange={(v) => setPort(v ?? 0)} />
+          <Form.Item label={t('pages.vpnProtocols.port')} required htmlFor="vpn-port">
+            <InputNumber
+              id="vpn-port"
+              min={1}
+              max={65535}
+              value={port}
+              onChange={(v) => setPort(v ?? 0)}
+            />
           </Form.Item>
-          <Form.Item label={t('pages.vpnProtocols.listen')}>
+          <Form.Item label={t('pages.vpnProtocols.listen')} htmlFor="vpn-listen">
             <Input
+              id="vpn-listen"
               value={listen}
               onChange={(e) => setListen(e.target.value)}
               style={{ width: 160 }}
             />
           </Form.Item>
-          <Form.Item label={t('enable')}>
-            <Switch checked={enable} onChange={setEnable} />
+          <Form.Item label={t('enable')} htmlFor="vpn-enable">
+            <Switch id="vpn-enable" checked={enable} onChange={setEnable} />
           </Form.Item>
         </Space>
 
@@ -312,6 +317,7 @@ export default function ProtocolInboundModal({ open, protocol, inbound, onClose 
             {ranges.map((range, index) => (
               <Space key={index} style={{ display: 'flex', marginBottom: 8 }}>
                 <Input
+                  aria-label={`${t('pages.vpnProtocols.ipRanges')} ${index + 1}`}
                   value={range}
                   placeholder="10.0.5.2-10.0.5.254"
                   style={{ width: 280 }}
@@ -322,13 +328,19 @@ export default function ProtocolInboundModal({ open, protocol, inbound, onClose 
                   }}
                 />
                 <MinusCircleOutlined
-                  onClick={() => setField('ipRanges', ranges.filter((_, i) => i !== index))}
+                  aria-label={t('remove')}
+                  onClick={() =>
+                    setField(
+                      'ipRanges',
+                      ranges.filter((_, i) => i !== index),
+                    )
+                  }
                 />
               </Space>
             ))}
             <Button
               size="small"
-              icon={<PlusOutlined />}
+              icon={<PlusOutlined aria-hidden />}
               onClick={() => setField('ipRanges', [...ranges, ''])}
             >
               {t('add')}
@@ -337,14 +349,16 @@ export default function ProtocolInboundModal({ open, protocol, inbound, onClose 
         )}
 
         {fields.map((field) => (
-          <Form.Item key={field.key} label={t(field.labelKey)}>
+          <Form.Item key={field.key} label={t(field.labelKey)} htmlFor={`vpn-field-${field.key}`}>
             {field.kind === 'bool' ? (
               <Switch
+                id={`vpn-field-${field.key}`}
                 checked={Boolean(settings[field.key])}
                 onChange={(v) => setField(field.key, v)}
               />
             ) : field.kind === 'number' ? (
               <InputNumber
+                id={`vpn-field-${field.key}`}
                 min={field.min}
                 max={field.max}
                 value={(settings[field.key] as number | undefined) ?? undefined}
@@ -352,6 +366,7 @@ export default function ProtocolInboundModal({ open, protocol, inbound, onClose 
               />
             ) : (
               <Input
+                id={`vpn-field-${field.key}`}
                 type={field.kind === 'password' ? 'password' : 'text'}
                 value={(settings[field.key] as string | undefined) ?? ''}
                 style={{ width: 280 }}
@@ -386,8 +401,8 @@ function Ikev2RemoteIdLine({ inboundId }: { inboundId: number }) {
   const { data } = useVpnIkev2RemoteId(inboundId);
   if (!data?.remoteId) return null;
   return (
-    <Form.Item label={t('pages.vpnProtocols.remoteId')}>
-      <Input value={data.remoteId} readOnly style={{ width: 280 }} />
+    <Form.Item label={t('pages.vpnProtocols.remoteId')} htmlFor="vpn-remote-id">
+      <Input id="vpn-remote-id" value={data.remoteId} readOnly style={{ width: 280 }} />
     </Form.Item>
   );
 }

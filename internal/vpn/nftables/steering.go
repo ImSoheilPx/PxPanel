@@ -8,10 +8,23 @@
 // c2c/cross toggles, dokodemo port, MSS clamps and raw-vs-IPsec gates. Those
 // services live in separate packages here (internal/vpn/<proto>/, landing wave
 // by wave), so the gathering is a registration instead of a cross-package
-// import: every protocol package registers one SteeringSource in its init(),
-// and whoever regenerates the ruleset (each protocol's SetupRouting, verbatim
-// the vpn-ui call shape) builds the input with GatherRulesInput so a
-// regeneration never drops another protocol's steering.
+// import: every protocol package registers one SteeringSource (init() for
+// l2tp/pptp/wgc/awg/gre, the Register() seam for sstp/ikev2/openvpn/ocserv —
+// both run before the first regeneration), and whoever regenerates the
+// ruleset (each protocol's SetupRouting, verbatim the vpn-ui call shape)
+// builds the input with GatherRulesInput so a regeneration never drops
+// another protocol's steering.
+//
+// WHY THE GATHERING MUST BE TOTAL: ApplyNftRules flushes and rebuilds the
+// shared vpn table from exactly the input it is handed (and deletes the table
+// when the input is empty). A regeneration that gathered only its own
+// protocol would therefore silently strip every other protocol's TPROXY
+// steering — the tunnel clients keep their tunnels up but their traffic
+// bypasses Xray entirely, so the panel's routing rules and accounting stop
+// applying to them with nothing on screen looking wrong. GatherRulesInput
+// also flushes the legacy RegisterRulesContributor list (rulesinput.go) for
+// the same reason: both registries are honored, so no wave's registration can
+// be silently dropped by a newer wave's regeneration path.
 //
 // Registration order (not map order) drives rule emission order, so the
 // ruleset text is stable within a process. Rules are order-independent across
@@ -82,13 +95,29 @@ func RegisterSteeringSource(protocol string, src SteeringSource) {
 // protocol package loaded (or none with inbounds) the input is empty and
 // ApplyNftRules removes the table — matching vpn-ui's all-protocols-empty
 // branch.
+//
+// The legacy RegisterRulesContributor list (rulesinput.go — the l2tp+pptp
+// wave's registry, before SteeringSource existed) is flushed FIRST, in
+// contributor registration order, so a regeneration sees that registry's
+// contributions too. vpn-ui had one gather that reached every protocol; the
+// two registries are the port's wave-history artifact, and honouring both
+// here is what keeps any regeneration from dropping a protocol that
+// registered through the other one.
 func GatherRulesInput() RulesInput {
+	var input RulesInput
+
+	rulesMu.RLock()
+	contribs := append([]func(*RulesInput){}, rulesContributor...)
+	rulesMu.RUnlock()
+	for _, c := range contribs {
+		c(&input)
+	}
+
 	steeringMu.RLock()
 	entries := make([]steeringEntry, len(steeringSources))
 	copy(entries, steeringSources)
 	steeringMu.RUnlock()
 
-	var input RulesInput
 	var greViews []GreView
 	for _, e := range entries {
 		if e.src.Nets != nil {
@@ -108,4 +137,21 @@ func GatherRulesInput() RulesInput {
 		input.GREIfaces, input.GREAllowed, input.GREBlocked = MergeGreViews(greViews)
 	}
 	return input
+}
+
+// RegisteredSteeringProtocols returns the protocol ids with a SteeringSource
+// in the registry, in registration order. It exists so the no-drops test can
+// assert every tunnel protocol actually registered its steering — a protocol
+// whose registration is missing regenerates into silently dropping every
+// other protocol's TPROXY rules, and nothing else in the build catches that
+// (the Nets funcs read the DB lazily, so a test cannot tell "not registered"
+// from "registered, DB empty" behaviourally).
+func RegisteredSteeringProtocols() []string {
+	steeringMu.RLock()
+	defer steeringMu.RUnlock()
+	out := make([]string, len(steeringSources))
+	for i, e := range steeringSources {
+		out[i] = e.protocol
+	}
+	return out
 }

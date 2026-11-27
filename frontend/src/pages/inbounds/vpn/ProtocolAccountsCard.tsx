@@ -4,7 +4,11 @@ import { Alert, Button, Card, Input, Modal, Space, Switch, Table, Tag, message }
 import type { ColumnsType } from 'antd/es/table';
 
 import type { AccountRow, DeviceConfig, SshClientConfig } from '@/schemas/api/vpn';
-import { useVpnAccounts, useVpnAccountMutations, useVpnOnlineMemberships } from '@/api/queries/useVpnAccounts';
+import {
+  useVpnAccounts,
+  useVpnAccountMutations,
+  useVpnOnlineMemberships,
+} from '@/api/queries/useVpnAccounts';
 import { useVpnDeviceConfigs } from '@/api/queries/useVpnProtocols';
 import type { VpnInboundRow } from '@/api/queries/useVpnProtocols';
 import { downloadText } from '@/lib/download';
@@ -94,6 +98,7 @@ export default function ProtocolAccountsCard({ inbound, onClose }: Props) {
         const membership = row.memberships.find((m) => m.inboundId === inbound.id);
         return (
           <Switch
+            aria-label={`${t('enable')} — ${row.email}`}
             checked={membership?.enable ?? false}
             onChange={(next) => onToggleMembership(row, next)}
           />
@@ -121,6 +126,7 @@ export default function ProtocolAccountsCard({ inbound, onClose }: Props) {
         <Space>
           <Input.Search
             allowClear
+            aria-label={t('search')}
             placeholder={t('search') || 'Search'}
             value={search}
             onChange={(e) => {
@@ -169,11 +175,11 @@ function DeviceConfigButton({ inbound, email }: { inbound: VpnInboundRow; email:
   const entries: DeviceConfigEntry[] = data ?? [];
 
   const onSaveAll = useCallback(() => {
-    entries.forEach((entry, index) => {
+    (data ?? []).forEach((entry, index) => {
       const text = deviceConfigText(entry);
       if (text) downloadText(`${email}-${index}.conf`, text);
     });
-  }, [entries, email]);
+  }, [data, email]);
 
   if (!enabled) {
     return (
@@ -204,7 +210,7 @@ function DeviceConfigButton({ inbound, email }: { inbound: VpnInboundRow; email:
       >
         {isFetching && <Alert type="info" message={t('loading')} />}
         {!isFetching && !data?.length && <Alert type="warning" message={t('noData')} />}
-        {(entries).map((entry, index) => {
+        {entries.map((entry, index) => {
           const text = deviceConfigText(entry);
           return (
             <Card

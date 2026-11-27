@@ -4,6 +4,8 @@ github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk
 github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/Jipok/wgctrl-go v1.2.0 h1:iASpMg0Urceh/B+ZXUsZcVt8vfsbk7KjpS7wSS9X91I=
 github.com/Jipok/wgctrl-go v1.2.0/go.mod h1:GrJJ7jsDCnIgf2t9mjYNF7KxmOT6codxbglM1XJx1K8=
+github.com/Jipok/wgctrl-go v1.3.1 h1:A68YpxcxpagG4JFw28FUPCEuGt3m+PmRlqPijUzX6Qo=
+github.com/Jipok/wgctrl-go v1.3.1/go.mod h1:GrJJ7jsDCnIgf2t9mjYNF7KxmOT6codxbglM1XJx1K8=
 github.com/alexbrainman/sspi v0.0.0-20250919150558-7d374ff0d59e h1:4dAU9FXIyQktpoUAgOJK3OTFc/xug0PCXYCqU0FgDKI=
 github.com/alexbrainman/sspi v0.0.0-20250919150558-7d374ff0d59e/go.mod h1:cEWa1LVoE5KvSD9ONXsZrj0z6KqySlCCNKHlLzbqAt4=
 github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20261116 h1:/LZYudfChLgd1qmfKR9gaNg1z4xBW9hyS+Ij0MJNVzo=

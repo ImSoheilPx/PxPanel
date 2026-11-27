@@ -5,6 +5,7 @@ import { TeamOutlined } from '@ant-design/icons';
 
 import { SizeFormatter, IntlUtil, ColorUtils } from '@/utils';
 import { InfinityIcon } from '@/components/ui';
+import { isVpnProtocol } from '@/schemas/api/vpn';
 import { useDatepicker } from '@/hooks/useDatepicker';
 import type { NodeRecord } from '@/api/queries/useNodesQuery';
 import { coerceInboundJsonField } from '@/models/dbinbound';
@@ -217,9 +218,18 @@ export function useInboundColumns({
         sorter: (a, b) => compareText(a.protocol, b.protocol),
         render: (_, record) => {
           const tags: ReactElement[] = [
-            <Tag key="p" color="purple">
-              {record.protocol}
-            </Tag>,
+            // VPN-protocol inbounds (l2tp/openvpn/ssh/...) share the xray
+            // inbound table; give them their own badge in the translated
+            // protocol name so the unified list reads at a glance.
+            isVpnProtocol(record.protocol) ? (
+              <Tag key="p" color="gold">
+                {t(`pages.vpnProtocols.protocolNames.${record.protocol}`)}
+              </Tag>
+            ) : (
+              <Tag key="p" color="purple">
+                {record.protocol}
+              </Tag>
+            ),
           ];
           if (record.isWireguard || record.isAmneziawg || record.isHysteria || record.isTuic) {
             tags.push(

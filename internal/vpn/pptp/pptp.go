@@ -358,7 +358,11 @@ func (s *PptpService) SetupAllTproxy() error {
 	// duplicates the old per-protocol guard piled up).
 	ensureVpnPolicyRoute(s.runCmd)
 
-	return s.nftService.ApplyNftRules(nftables.RulesInputFor())
+	// GatherRulesInput (not a pptp-only RulesInput): the vpn table is rebuilt
+	// from exactly the input it is handed, so this regeneration must compose
+	// every registered protocol's steering — a pptp-only input would strip the
+	// other protocols' TPROXY rules here.
+	return s.nftService.ApplyNftRules(nftables.GatherRulesInput())
 }
 
 // RestartServices (re)launches pptpd as a panel-managed child process.

@@ -394,7 +394,11 @@ func (s *L2tpService) SetupAllTproxy() error {
 	// duplicates the old per-protocol guard piled up).
 	ensureVpnPolicyRoute(s.runCmd)
 
-	return s.nftService.ApplyNftRules(nftables.RulesInputFor())
+	// GatherRulesInput (not a l2tp-only RulesInput): the vpn table is rebuilt
+	// from exactly the input it is handed, so this regeneration must compose
+	// every registered protocol's steering — a l2tp-only input would strip the
+	// other protocols' TPROXY rules here.
+	return s.nftService.ApplyNftRules(nftables.GatherRulesInput())
 }
 
 // writeL2tpSwanctlConn writes the L2TP IKEv1 transport-mode PSK connection(s) into the

@@ -65,7 +65,14 @@ export function useVpnInbounds() {
     queryKey: keys.inbounds.root(),
     queryFn: fetchVpnInbounds,
   });
-  return { inbounds: query.data ?? [], loading: query.isFetching, refetch: query.refetch, fetched: query.isSuccess, fetchError: query.error instanceof Error ? query.error.message : query.error ? String(query.error) : null };
+  return {
+    inbounds: query.data ?? [],
+    loading: query.isFetching,
+    refetch: query.refetch,
+    fetched: query.isSuccess,
+    fetchError:
+      query.error instanceof Error ? query.error.message : query.error ? String(query.error) : null,
+  };
 }
 
 async function fetchAddressing(inboundId: number): Promise<AddressingReport | null> {
@@ -138,11 +145,9 @@ export function useVpnDeviceConfigs(
   });
 }
 async function fetchIkev2RemoteId(inboundId: number): Promise<Ikev2RemoteId | null> {
-  const msg = await HttpUtil.get(
-    `/panel/api/inbounds/${inboundId}/ikev2-remote-id`,
-    undefined,
-    { silent: true },
-  );
+  const msg = await HttpUtil.get(`/panel/api/inbounds/${inboundId}/ikev2-remote-id`, undefined, {
+    silent: true,
+  });
   if (!msg?.success) return null;
   const validated = parseMsg(msg, Ikev2RemoteIdSchema, 'inbounds/ikev2-remote-id');
   return validated.obj;

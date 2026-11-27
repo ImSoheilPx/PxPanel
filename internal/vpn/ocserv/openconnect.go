@@ -514,10 +514,13 @@ bindaddr	*
 // nftables regeneration with the other VPN protocols.
 //
 // PORT NOTE: vpn-ui's ApplyNftRules gathered every protocol's subnets in one
-// shot; the foundation's ApplyNftRules takes them pre-gathered as RulesInput.
-// This passes OpenConnect's own nets — TODO(controllers wave): one regeneration
-// should compose every landed protocol's nets so no protocol's rules are
-// temporarily absent while another reapplies the table.
+// shot; the foundation's ApplyNftRules takes them pre-gathered as RulesInput,
+// and GatherRulesInput composes every protocol that registered a steering
+// source (register.go) — so this regeneration keeps the other protocols'
+// TPROXY rules instead of dropping them (vpn-ui behaviour; a self-only input
+// would rebuild the shared vpn table without them, sending every other
+// protocol's client traffic straight out the WAN, past Xray and its routing
+// rules).
 func (s *OcservService) SetupRouting() error {
 	s.runCmd("sysctl", "-w", "net.ipv4.ip_forward=1")
 
@@ -530,7 +533,7 @@ func (s *OcservService) SetupRouting() error {
 	if svc == nil {
 		svc = &nftables.Service{}
 	}
-	return svc.ApplyNftRules(nftables.RulesInput{Nets: s.nftSteeringNets()})
+	return svc.ApplyNftRules(nftables.GatherRulesInput())
 }
 
 // nftSteeringNets maps the enabled OpenConnect inbounds onto the foundation's

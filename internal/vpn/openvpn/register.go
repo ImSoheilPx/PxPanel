@@ -19,6 +19,7 @@ import (
 
 	"github.com/ImSoheilPx/pxpanel/internal/database/model"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn"
+	"github.com/ImSoheilPx/pxpanel/internal/vpn/nftables"
 	vpnrange "github.com/ImSoheilPx/pxpanel/internal/vpn/range"
 )
 
@@ -29,6 +30,16 @@ func Register() {
 	// subnetHoldsIP): both transports' subnets, since a session's
 	// Framed-IP-Address comes from whichever transport the device dialed.
 	vpn.RegisterSubnetResolver("openvpn", ovpnSubnetsForInbound)
+	// Shared-ruleset steering (vpn-ui nftables.go OpenVPN TPROXY loop —
+	// ovpnCIDRs + c2c/cross + the 12300+id dokodemo port, UDP block and its
+	// 10.3.x TCP mirror together). Registering here means ANY protocol's
+	// regeneration that gathers through nftables.GatherRulesInput keeps
+	// OpenVPN's TPROXY rules live — and OpenVPN's own SetupRouting gathers the
+	// same way, so it keeps everyone else's. Wire-up order guarantees this
+	// runs before the first regeneration: RegisterVpnProtocols (web.go) runs
+	// before the WireVpnStack Init* sequence, and the Nets func reads the DB
+	// lazily at gather time.
+	nftables.RegisterSteeringSource("openvpn", nftables.SteeringSource{Nets: (&OpenVpnService{}).nftSteeringNets})
 }
 
 // ovpnSubnetsOrDefault returns the ordered /24 prefixes for an OpenVPN transport

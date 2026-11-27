@@ -39,6 +39,51 @@
 // readers and the restart hook are registered, and the per-protocol services
 // override the default relay readers when their waves land.
 //
+// # Routing-rules contract (how the operator's panel rules reach VPN traffic)
+//
+// The operator's routing rules live in the Xray template's routing.rules and
+// are matched FIRST-match against EVERY inbound in the generated config. The
+// paired inbounds carry inbound.Tag, so destination rules (domain/ip) and
+// inboundTag/user rules target them like any native inbound. What this package
+// adds on top is the one carrier Xray cannot match natively — a pool client's
+// tunnel IP — via TranslateVpnRoutingRules (routing.go): per-email rules split
+// into a source rule for pool clients (their dokodemo inbound has no user to
+// match) and keep the user match for the relays (whose account arrives as the
+// socks username) and the native inbounds, then append the /12 blackhole
+// backstop LAST so it never shadows an operator rule.
+//
+// Per-protocol destination visibility (what an operator's domain/ip rule can
+// see, protocol by protocol):
+//
+//   - The nine tunnel protocols: TPROXY'd client traffic enters the paired
+//     dokodemo with the ORIGINAL destination. IP rules always match; domain
+//     rules match what sniffing recovers (destOverride http,tls — i.e. TLS
+//     SNI / HTTP Host). A plaintext destination only ever had an IP.
+//   - SSH: the relay passes the direct-tcpip destination through VERBATIM —
+//     hostnames ride ATYP=domain (ssh_socks.go socksEncodeAddr) — so domain
+//     rules match whenever the SSH client does not resolve locally. The udpgw
+//     bridge is raw-IP by wire format (badvpn); its UDP egress is reachable
+//     by IP rules only.
+//   - MTProto: NOT routed through Xray in this panel. The v3 mtg sidecar
+//     terminates the protocol and EGRESSES DIRECTLY (internal/mtproto owns
+//     that plane; the web layer deliberately excludes mtproto from
+//     InjectPairedInbounds, unlike vpn-ui which paired a telemt socks
+//     inbound). Forcing MTProto through an Xray inbound would break the
+//     protocol (the middle-proxy RPC key is derived from the egress IP+PORT,
+//     and transport-wise the sidecar's obfuscated transport is not a plain
+//     TCP/UDP flow Xray could re-emit). MTProto inbounds therefore do not
+//     follow the panel's Xray routing rules, by design; steer them with the
+//     sidecar's own egress controls (adtag/proxy settings), not routing
+//     rules. RelayAccountsFor still answers for mtproto so a FUTURE transport
+//     that can route through Xray gets the pairing machinery unchanged.
+//
+// The tunnel protocols' kernel half (TPROXY steering into the dokodemo ports)
+// is the nftables package's steering registry; every regeneration must gather
+// ALL registered protocols (nftables.GatherRulesInput) — a self-only gather
+// would rebuild the shared vpn table without the other protocols' TPROXY
+// rules and their traffic would bypass Xray (and these routing rules)
+// entirely.
+//
 // TODO(controllers wave):
 //   - wire SetRestartHook / SetNeedRestartHook to the web XrayService
 //     (RestartXray / SetToNeedRestart) at server start-up; relay account

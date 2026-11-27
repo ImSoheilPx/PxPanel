@@ -6,6 +6,9 @@
 .nodes-page,
 .groups-page,
 .api-docs-page,
+.resellers-page,
+.admins-page,
+.vpn-outbounds-page,
 .sponsors-page {
   --bg-page: #e6e8ec;
   --bg-card: #ffffff;
@@ -21,6 +24,9 @@
 .nodes-page.is-dark,
 .groups-page.is-dark,
 .api-docs-page.is-dark,
+.resellers-page.is-dark,
+.admins-page.is-dark,
+.vpn-outbounds-page.is-dark,
 .sponsors-page.is-dark {
   --bg-page: #1a1b1f;
   --bg-card: #23252b;
@@ -34,6 +40,9 @@
 .nodes-page.is-dark.is-ultra,
 .groups-page.is-dark.is-ultra,
 .api-docs-page.is-dark.is-ultra,
+.resellers-page.is-dark.is-ultra,
+.admins-page.is-dark.is-ultra,
+.vpn-outbounds-page.is-dark.is-ultra,
 .sponsors-page.is-dark.is-ultra {
   --bg-page: #000;
   --bg-card: #101013;
@@ -54,7 +63,13 @@
 .groups-page .ant-layout,
 .groups-page .ant-layout-content,
 .api-docs-page .ant-layout,
-.api-docs-page .ant-layout-content {
+.api-docs-page .ant-layout-content,
+.resellers-page .ant-layout,
+.resellers-page .ant-layout-content,
+.admins-page .ant-layout,
+.admins-page .ant-layout-content,
+.vpn-outbounds-page .ant-layout,
+.vpn-outbounds-page .ant-layout-content {
   background: transparent;
 }
 
@@ -65,7 +80,10 @@
 .settings-page .content-shell,
 .nodes-page .content-shell,
 .groups-page .content-shell,
-.api-docs-page .content-shell {
+.api-docs-page .content-shell,
+.resellers-page .content-shell,
+.admins-page .content-shell,
+.vpn-outbounds-page .content-shell {
   background: transparent;
 }
 
@@ -75,7 +93,10 @@
 .xray-page .content-area,
 .settings-page .content-area,
 .nodes-page .content-area,
-.groups-page .content-area {
+.groups-page .content-area,
+.resellers-page .content-area,
+.admins-page .content-area,
+.vpn-outbounds-page .content-area {
   padding: 24px;
 }
 
@@ -83,7 +104,10 @@
   .clients-page .content-area,
   .inbounds-page .content-area,
   .nodes-page .content-area,
-  .groups-page .content-area {
+  .groups-page .content-area,
+  .resellers-page .content-area,
+  .admins-page .content-area,
+  .vpn-outbounds-page .content-area {
     padding: 8px;
   }
 }
@@ -177,7 +201,8 @@ body.dark .ant-dropdown-menu-item-divider {
 .clients-page .summary-card,
 .inbounds-page .summary-card,
 .nodes-page .summary-card,
-.groups-page .summary-card {
+.groups-page .summary-card,
+.resellers-page .summary-card {
   padding: 16px;
 }
 
@@ -185,7 +210,8 @@ body.dark .ant-dropdown-menu-item-divider {
   .clients-page .summary-card,
   .inbounds-page .summary-card,
   .nodes-page .summary-card,
-  .groups-page .summary-card {
+  .groups-page .summary-card,
+  .resellers-page .summary-card {
     padding: 8px;
   }
 }

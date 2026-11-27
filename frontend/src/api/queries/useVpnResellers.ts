@@ -27,7 +27,14 @@ async function fetchAssignableInbounds(): Promise<InboundBrief[]> {
 
 export function useVpnResellersQuery() {
   const query = useQuery({ queryKey: keys.vpn.resellers.list(), queryFn: fetchResellers });
-  return { resellers: query.data ?? [], loading: query.isFetching, refetch: query.refetch, fetched: query.isSuccess, fetchError: query.error instanceof Error ? query.error.message : query.error ? String(query.error) : null };
+  return {
+    resellers: query.data ?? [],
+    loading: query.isFetching,
+    refetch: query.refetch,
+    fetched: query.isSuccess,
+    fetchError:
+      query.error instanceof Error ? query.error.message : query.error ? String(query.error) : null,
+  };
 }
 
 export function useVpnResellerInboundsQuery() {

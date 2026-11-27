@@ -18,7 +18,7 @@ type nftService nftables.Service
 
 // ApplyNftRules regenerates the whole VPN ruleset from every registered
 // protocol's contribution (vpn-ui NftService.ApplyNftRules() with no args — the
-// gather is the contributor registry now).
+// gather is the steering registry now).
 func (s *nftService) ApplyNftRules(input nftables.RulesInput) error {
 	svc := nftables.Service(*s)
 	return svc.ApplyNftRules(input)
@@ -38,30 +38,40 @@ func ensureVpnPolicyRoute(run func(name string, args ...string) error) {
 	nftables.EnsureVpnPolicyRoute(run)
 }
 
+// pptpSteeringNets is this protocol's SteeringSource: one net per enabled pptp
+// inbound (cross-inbound pass) plus its TPROXY port (paired dokodemo). The body
+// is the pptp block of vpn-ui's ApplyNftRules verbatim.
+func pptpSteeringNets() []nftables.SteeringNet {
+	svc := &PptpService{}
+	inbounds, err := svc.GetPptpInbounds()
+	if err != nil {
+		return nil
+	}
+
+	var nets []nftables.SteeringNet
+	for _, inbound := range inbounds {
+		if !inbound.Enable {
+			continue
+		}
+		st, err := svc.parseSettings(inbound)
+		if err != nil {
+			continue
+		}
+		nets = append(nets, nftables.SteeringNet{
+			Subnets:    nftables.SubnetCIDRs(svc.GetSubnetsForInbound(inbound)),
+			C2C:        st.ClientToClient,
+			Cross:      st.CrossInbound,
+			TproxyPort: svc.GetTproxyPort(inbound),
+		})
+	}
+	return nets
+}
+
 func init() {
 	// Register PPTP's steering contribution: one net per enabled pptp inbound
-	// (cross-inbound pass) plus its TPROXY port (paired dokodemo).
-	nftables.RegisterRulesContributor(func(input *nftables.RulesInput) {
-		svc := &PptpService{}
-		inbounds, err := svc.GetPptpInbounds()
-		if err != nil {
-			return
-		}
-
-		for _, inbound := range inbounds {
-			if !inbound.Enable {
-				continue
-			}
-			st, err := svc.parseSettings(inbound)
-			if err != nil {
-				continue
-			}
-			input.Nets = append(input.Nets, nftables.SteeringNet{
-				Subnets:    nftables.SubnetCIDRs(svc.GetSubnetsForInbound(inbound)),
-				C2C:        st.ClientToClient,
-				Cross:      st.CrossInbound,
-				TproxyPort: svc.GetTproxyPort(inbound),
-			})
-		}
-	})
+	// (cross-inbound pass) plus its TPROXY port (paired dokodemo). Registered
+	// into the shared SteeringSource registry so any protocol's regeneration
+	// (GatherRulesInput) keeps PPTP's rules live — and PPTP's own regeneration
+	// (SetupRouting) keeps everyone else's.
+	nftables.RegisterSteeringSource("pptp", nftables.SteeringSource{Nets: pptpSteeringNets})
 }

@@ -44,6 +44,7 @@ import {
 } from '@/schemas/forms/inbound-form';
 import { FormField, rhfZodValidate } from '@/components/form/rhf';
 import { Protocols, TRAFFIC_RESETS } from '@/schemas/primitives';
+import { VPN_PROTOCOLS, isVpnProtocol, type VpnProtocol } from '@/schemas/api/vpn';
 import { SockoptStreamSettingsSchema } from '@/schemas/protocols/stream/sockopt';
 import { HysteriaStreamSettingsSchema } from '@/schemas/protocols/stream/hysteria';
 import {
@@ -102,6 +103,9 @@ import type { DBInbound } from '@/models/dbinbound';
 import type { NodeRecord } from '@/api/queries/useNodesQuery';
 
 const PROTOCOL_OPTIONS = Object.values(Protocols).map((p) => ({ value: p, label: p }));
+// NativeSelect renders a flat option list, so the VPN section gets a disabled
+// header row as its visual grouping; the real entries follow it.
+const VPN_PROTOCOL_GROUP_SENTINEL = '__vpn-protocols__';
 const SHARE_ADDR_STRATEGIES = ['node', 'listen', 'custom'] as const;
 const SHARE_ADDR_HOSTNAME_RE =
   /^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$/;
@@ -194,6 +198,13 @@ interface InboundFormModalProps {
   dbInbounds: DBInbound[];
   availableNodes?: NodeRecord[];
   availableNodesFetched?: boolean;
+  /**
+   * Set by the unified inbounds page: picking one of the VPN protocols in the
+   * add-mode protocol picker immediately hands off to the vpn-specific
+   * ProtocolInboundModal (this xray form cannot build those inbounds). When
+   * omitted the picker keeps its xray-only option list.
+   */
+  onVpnProtocolPicked?: (protocol: VpnProtocol) => void;
 }
 
 function buildAddModeValues(): InboundFormValues {
@@ -252,6 +263,7 @@ export default function InboundFormModal({
   dbInbounds,
   availableNodes,
   availableNodesFetched = true,
+  onVpnProtocolPicked,
 }: InboundFormModalProps) {
   const { t } = useTranslation();
   const uid = useId();
@@ -282,6 +294,24 @@ export default function InboundFormModal({
 
   const selectableNodes = (availableNodes || []).filter((n) => n.enable);
   const protocol = (useWatch({ control, name: 'protocol' }) ?? '') as string;
+  // Add-mode picker: xray protocols first, then (when the caller can handle
+  // them) a disabled "VPN Protocols" header followed by the vpn protocols —
+  // picking one delegates to ProtocolInboundModal via onVpnProtocolPicked.
+  const protocolOptions =
+    onVpnProtocolPicked && mode === 'add'
+      ? [
+          ...PROTOCOL_OPTIONS,
+          {
+            value: VPN_PROTOCOL_GROUP_SENTINEL,
+            label: t('pages.vpnProtocols.title'),
+            disabled: true,
+          },
+          ...VPN_PROTOCOLS.map((p) => ({
+            value: p,
+            label: t(`pages.vpnProtocols.protocolNames.${p}`),
+          })),
+        ]
+      : PROTOCOL_OPTIONS;
   const isNodeEligible = !!NODE_ELIGIBLE_PROTOCOLS[protocol];
   /*
    * The `node` share-address strategy only means something when the inbound can
@@ -726,8 +756,23 @@ export default function InboundFormModal({
         </FormField>
       )}
 
-      <FormField name="protocol" label={t('pages.inbounds.protocol')}>
-        <NativeSelect id="protocol" disabled={mode === 'edit'} options={PROTOCOL_OPTIONS} />
+      <FormField
+        name="protocol"
+        label={t('pages.inbounds.protocol')}
+        onAfterChange={(value) => {
+          // A vpn protocol can't be built by this xray form: hand the choice
+          // to the caller, which swaps in ProtocolInboundModal.
+          if (
+            mode === 'add' &&
+            typeof value === 'string' &&
+            isVpnProtocol(value) &&
+            onVpnProtocolPicked
+          ) {
+            onVpnProtocolPicked(value);
+          }
+        }}
+      >
+        <NativeSelect id="protocol" disabled={mode === 'edit'} options={protocolOptions} />
       </FormField>
 
       <FormField

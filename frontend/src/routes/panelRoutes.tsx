@@ -9,7 +9,6 @@ import {
   GlobalOutlined,
   HddOutlined,
   ImportOutlined,
-  SafetyCertificateOutlined,
   SettingOutlined,
   ShopOutlined,
   SwapOutlined,
@@ -28,7 +27,6 @@ const HostsPage = lazy(() => import('@/pages/hosts/HostsPage'));
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'));
 const XrayPage = lazy(() => import('@/pages/xray/XrayPage'));
 const ApiDocsPage = lazy(() => import('@/pages/api-docs/ApiDocsPage'));
-const VpnProtocolsPage = lazy(() => import('@/pages/vpn-protocols/VpnProtocolsPage'));
 const VpnOutboundsPage = lazy(() => import('@/pages/vpn-outbounds/VpnOutboundsPage'));
 const ResellersPage = lazy(() => import('@/pages/resellers/ResellersPage'));
 const AdminsPage = lazy(() => import('@/pages/admins/AdminsPage'));
@@ -50,12 +48,6 @@ export const PANEL_ROUTES: PanelRoute[] = [
   { path: '/groups', titleKey: 'menu.groups', icon: TagsOutlined, component: GroupsPage },
   { path: '/nodes', titleKey: 'menu.nodes', icon: ClusterOutlined, component: NodesPage },
   { path: '/hosts', titleKey: 'menu.hosts', icon: GlobalOutlined, component: HostsPage },
-  {
-    path: '/vpn-protocols',
-    titleKey: 'menu.vpnProtocols',
-    icon: SafetyCertificateOutlined,
-    component: VpnProtocolsPage,
-  },
   {
     path: '/vpn-outbounds',
     titleKey: 'menu.vpnOutbounds',

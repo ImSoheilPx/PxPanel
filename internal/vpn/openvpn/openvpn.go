@@ -888,10 +888,13 @@ func (s *OpenVpnService) writeCertFiles(inbound *model.Inbound) error {
 // the nftables rules. Mirrors L2tpService.SetupAllTproxy.
 //
 // PORT NOTE: vpn-ui's ApplyNftRules gathered every protocol's subnets in one
-// shot; the foundation's ApplyNftRules takes them pre-gathered as RulesInput.
-// This passes OpenVPN's own nets — TODO(controllers wave): one regeneration
-// should compose every landed protocol's nets so no protocol's rules are
-// temporarily absent while another reapplies the table.
+// shot; the foundation's ApplyNftRules takes them pre-gathered as RulesInput,
+// and GatherRulesInput composes every protocol that registered a steering
+// source (register.go) — so this regeneration keeps the other protocols'
+// TPROXY rules instead of dropping them (vpn-ui behaviour; a self-only input
+// would rebuild the shared vpn table without them, sending every other
+// protocol's client traffic straight out the WAN, past Xray and its routing
+// rules).
 func (s *OpenVpnService) SetupRouting() error {
 	// Enable IP forwarding
 	s.runCmd("sysctl", "-w", "net.ipv4.ip_forward=1")
@@ -908,7 +911,7 @@ func (s *OpenVpnService) SetupRouting() error {
 	if svc == nil {
 		svc = &nftables.Service{}
 	}
-	return svc.ApplyNftRules(nftables.RulesInput{Nets: s.nftSteeringNets()})
+	return svc.ApplyNftRules(nftables.GatherRulesInput())
 }
 
 // nftSteeringNets maps the enabled OpenVPN inbounds onto the foundation's

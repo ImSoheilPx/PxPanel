@@ -29,6 +29,7 @@ import {
 
 import { HttpUtil } from '@/utils';
 import { activateOnKey } from '@/utils/a11y';
+import { VPN_PROTOCOLS, isVpnProtocol } from '@/schemas/api/vpn';
 
 import { buildRowActionsMenu } from './RowActions';
 import { useInboundColumns } from './useInboundColumns';
@@ -71,6 +72,11 @@ export default function InboundList({
   // Node filter (#4997): 'all' shows everything, 0 is the local-panel
   // sentinel (inbounds without a nodeId), otherwise a node id. Session-only.
   const [nodeFilter, setNodeFilter] = useState<number | 'all'>('all');
+  // VPN-protocol filter: 'all' shows everything, otherwise an exact vpn
+  // protocol name (l2tp, openvpn, ssh, ...). Session-only, like the node
+  // filter. Only rendered when the list actually carries vpn rows so
+  // xray-only installs keep their original toolbar.
+  const [vpnFilter, setVpnFilter] = useState<string | 'all'>('all');
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const searchParam = searchParams.get('search');
@@ -89,6 +95,22 @@ export default function InboundList({
     [nodesById, dbInbounds],
   );
 
+  const hasVpnInbounds = useMemo(
+    () => dbInbounds.some((ib) => isVpnProtocol(ib.protocol)),
+    [dbInbounds],
+  );
+
+  const vpnFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: t('all') },
+      ...VPN_PROTOCOLS.map((p) => ({
+        value: p,
+        label: t(`pages.vpnProtocols.protocolNames.${p}`),
+      })),
+    ],
+    [t],
+  );
+
   const nodeFilterOptions = useMemo(
     () => [
       { value: 'all' as const, label: t('pages.clients.filters.nodes') },
@@ -104,6 +126,9 @@ export default function InboundList({
     let list = dbInbounds;
     if (nodeFilter === 0) list = list.filter((ib) => ib.nodeId == null);
     else if (nodeFilter !== 'all') list = list.filter((ib) => ib.nodeId === nodeFilter);
+    if (vpnFilter !== 'all') {
+      list = list.filter((ib) => ib.protocol === vpnFilter);
+    }
     const q = searchKey.trim().toLowerCase();
     if (!q) return list;
     return list.filter((ib) => {
@@ -113,7 +138,7 @@ export default function InboundList({
       const hostRemarks = hostRemarksByInboundId.get(ib.id) ?? [];
       return hostRemarks.some((remark) => remark.toLowerCase().includes(q));
     });
-  }, [dbInbounds, nodeFilter, searchKey, hostRemarksByInboundId]);
+  }, [dbInbounds, nodeFilter, vpnFilter, searchKey, hostRemarksByInboundId]);
 
   const onSwitchEnable = useCallback(async (dbInbound: DBInboundRecord, next: boolean) => {
     const previous = dbInbound.enable;
@@ -250,6 +275,16 @@ export default function InboundList({
               aria-label={t('pages.clients.filters.nodes')}
             />
           )}
+          {hasVpnInbounds && (
+            <Select
+              value={vpnFilter}
+              onChange={(v) => setVpnFilter(v)}
+              options={vpnFilterOptions}
+              popupMatchSelectWidth={false}
+              style={{ minWidth: isMobile ? 90 : 130 }}
+              aria-label={t('protocol')}
+            />
+          )}
           <Input
             value={searchKey}
             onChange={(e) => setSearchKey(e.target.value)}
@@ -320,16 +355,18 @@ export default function InboundList({
                         <HostRemarksSuffix remarks={hostRemarksByInboundId.get(record.id) ?? []} />
                       </span>
                       <div className="card-actions">
-                        <Tooltip title={t('pages.inbounds.inboundInfo')}>
-                          <InfoCircleOutlined
-                            className="row-action-trigger"
-                            role="button"
-                            tabIndex={0}
-                            aria-label={t('pages.inbounds.inboundInfo')}
-                            onClick={() => setStatsRecord(record)}
-                            onKeyDown={activateOnKey(() => setStatsRecord(record))}
-                          />
-                        </Tooltip>
+                        {!isVpnProtocol(record.protocol) && (
+                          <Tooltip title={t('pages.inbounds.inboundInfo')}>
+                            <InfoCircleOutlined
+                              className="row-action-trigger"
+                              role="button"
+                              tabIndex={0}
+                              aria-label={t('pages.inbounds.inboundInfo')}
+                              onClick={() => setStatsRecord(record)}
+                              onKeyDown={activateOnKey(() => setStatsRecord(record))}
+                            />
+                          </Tooltip>
+                        )}
                         <Switch
                           aria-label={t('pages.inbounds.enable')}
                           checked={record.enable}

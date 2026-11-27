@@ -14,6 +14,7 @@ import {
   message,
 } from 'antd';
 
+import { selectTagRender } from '@/components/form';
 import type { AccountRow, BulkPreview } from '@/schemas/api/vpn';
 import {
   useVpnAccountMutations,
@@ -145,6 +146,7 @@ export default function ResellerBulkModal({ open, onClose }: Props) {
           <Select
             mode="multiple"
             allowClear
+            tagRender={selectTagRender}
             options={assignable.map((option) => ({
               value: option.id,
               label: `${option.remark || `#${option.id}`} (${option.protocol}:${option.port})`,
@@ -156,11 +158,17 @@ export default function ResellerBulkModal({ open, onClose }: Props) {
           label={t('pages.resellers.bulk.targets')}
           rules={[{ required: true, message: t('pages.resellers.bulk.pickTargets') }]}
         >
-          <Select mode="multiple" allowClear showSearch options={emailOptions} />
+          <Select
+            mode="multiple"
+            allowClear
+            showSearch
+            tagRender={selectTagRender}
+            options={emailOptions}
+          />
         </Form.Item>
       </Form>
 
-      <Spin spinning={previewing}>
+      <Spin spinning={previewing} aria-live="off">
         {preview && (
           <div>
             <Space size="large" wrap style={{ marginBottom: 12 }}>

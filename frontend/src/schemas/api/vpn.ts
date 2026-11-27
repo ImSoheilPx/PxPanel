@@ -231,7 +231,8 @@ export const CoreConfigEnvelopeSchema = loose.extend({
 export type CoreConfigEnvelope = z.infer<typeof CoreConfigEnvelopeSchema>;
 
 export const CoreConfigSaveResultSchema = loose.extend({
-  health: loose.extend({ ok: z.boolean().default(false), logs: z.string().default('') })
+  health: loose
+    .extend({ ok: z.boolean().default(false), logs: z.string().default('') })
     .default({ ok: false, logs: '' }),
   targets: z.array(CoreConfigTargetSchema).default([]),
 });
@@ -353,3 +354,12 @@ export const VPN_PROTOCOLS = [
 ] as const;
 
 export type VpnProtocol = (typeof VPN_PROTOCOLS)[number];
+
+const VPN_PROTOCOL_SET: ReadonlySet<string> = new Set(VPN_PROTOCOLS);
+
+// The inbound table mixes xray-native and vpn-protocol rows (one DB table, one
+// /panel/api/inbounds/list response); this is the row-level discriminator the
+// inbounds page uses to pick the vpn-specific actions and forms.
+export function isVpnProtocol(protocol: string): protocol is VpnProtocol {
+  return VPN_PROTOCOL_SET.has(protocol);
+}

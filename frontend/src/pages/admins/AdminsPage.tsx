@@ -25,6 +25,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import AppSidebar from '@/layouts/AppSidebar';
 import { setMessageInstance } from '@/utils/messageBus';
+import { selectTagRender } from '@/components/form';
 import type { AdminRow, InboundBrief, PermissionSlug } from '@/schemas/api/vpn';
 import {
   useVpnAdminInboundsQuery,
@@ -242,6 +243,7 @@ export default function AdminsPage() {
             <Select
               style={{ width: '100%' }}
               placeholder={t('pages.admins.reassignFrom')}
+              aria-label={t('pages.admins.reassignFrom')}
               value={reassignFrom}
               onChange={setReassignFrom}
               options={admins.map((admin) => ({
@@ -252,6 +254,7 @@ export default function AdminsPage() {
             <Select
               style={{ width: '100%' }}
               placeholder={t('pages.admins.reassignTo')}
+              aria-label={t('pages.admins.reassignTo')}
               value={reassignTo}
               onChange={setReassignTo}
               options={admins.map((admin) => ({
@@ -372,6 +375,7 @@ function AdminFormModal({
                   <Select
                     mode="multiple"
                     allowClear
+                    tagRender={selectTagRender}
                     options={permissions.map((permission) => ({
                       value: permission.slug,
                       label: permission.slug,
@@ -382,6 +386,7 @@ function AdminFormModal({
                   <Select
                     mode="multiple"
                     allowClear
+                    tagRender={selectTagRender}
                     options={inboundOptions.map((option) => ({
                       value: option.id,
                       label: inboundOptionLabel(option),

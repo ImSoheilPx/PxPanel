@@ -162,15 +162,12 @@ export function useVpnCoreMutations() {
 
   const saveConfigMut = useMutation({
     mutationFn: (payload: { core: string; inboundId: number; file: string; text: string }) =>
-      HttpUtil.post(
-        `/panel/api/core/config/${encodeURIComponent(payload.core)}`,
-        {
-          inboundId: payload.inboundId,
-          file: payload.file,
-          mode: 'replace',
-          text: payload.text,
-        },
-      ),
+      HttpUtil.post(`/panel/api/core/config/${encodeURIComponent(payload.core)}`, {
+        inboundId: payload.inboundId,
+        file: payload.file,
+        mode: 'replace',
+        text: payload.text,
+      }),
     onSuccess: () => {
       invalidate();
     },

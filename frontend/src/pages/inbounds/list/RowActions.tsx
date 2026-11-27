@@ -10,11 +10,14 @@ import {
   DeleteOutlined,
   InfoCircleOutlined,
   TagsOutlined,
+  TeamOutlined,
+  ToolOutlined,
   UsergroupAddOutlined,
   UsergroupDeleteOutlined,
 } from '@ant-design/icons';
 
 import { isInboundMultiUser } from './helpers';
+import { isVpnProtocol } from '@/schemas/api/vpn';
 import type { DBInboundRecord, RowAction } from './types';
 
 interface RowActionsMenuProps {
@@ -41,6 +44,30 @@ export function buildRowActionsMenu({
   const items: MenuProps['items'] = [];
   if (isMobile) {
     items.push({ key: 'edit', icon: <EditOutlined aria-hidden />, label: t('edit') });
+  }
+  // VPN-protocol rows run their own server-side managers, so the xray flows
+  // (share links, client attach/clone, traffic reset) do not apply — they get
+  // the accounts / toolbox pair instead. Edit stays the primary action and
+  // opens ProtocolInboundModal on the page.
+  if (isVpnProtocol(record.protocol)) {
+    items.push({
+      key: 'vpnAccounts',
+      icon: <TeamOutlined aria-hidden />,
+      label: t('pages.vpnProtocols.accounts'),
+    });
+    items.push({
+      key: 'vpnToolbox',
+      icon: <ToolOutlined aria-hidden />,
+      label: t('pages.vpnProtocols.toolbox'),
+    });
+    items.push({ type: 'divider' });
+    items.push({
+      key: 'delete',
+      icon: <DeleteOutlined aria-hidden />,
+      danger: true,
+      label: t('delete'),
+    });
+    return items;
   }
   if (isInboundMultiUser(record)) {
     items.push({

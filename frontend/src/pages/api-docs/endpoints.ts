@@ -3193,9 +3193,27 @@ export const sections: readonly Section[] = [
         summary:
           'One page of VPN accounts the caller may see, each with its traffic counters and membership list. An account with no membership carries its credentials inline instead (the unserved-account case).',
         params: [
-          { name: 'page', in: 'query', type: 'integer', desc: '1-based page number. Default 1.', optional: true },
-          { name: 'size', in: 'query', type: 'integer', desc: 'Page size. Default and cap are server-defined.', optional: true },
-          { name: 'search', in: 'query', type: 'string', desc: 'Filter by email substring.', optional: true },
+          {
+            name: 'page',
+            in: 'query',
+            type: 'integer',
+            desc: '1-based page number. Default 1.',
+            optional: true,
+          },
+          {
+            name: 'size',
+            in: 'query',
+            type: 'integer',
+            desc: 'Page size. Default and cap are server-defined.',
+            optional: true,
+          },
+          {
+            name: 'search',
+            in: 'query',
+            type: 'string',
+            desc: 'Filter by email substring.',
+            optional: true,
+          },
           {
             name: 'sort',
             in: 'query',
@@ -3221,7 +3239,7 @@ export const sections: readonly Section[] = [
         summary:
           'Create or edit an account that NO inbound serves (an unserved account), with its full membership set. Super-admin only: an account on nothing is visible to nobody else.',
         description:
-          'Always posts the account\'s ENTIRE membership set — this route\'s contract is that the posted set is the account\'s set, not a delta. Inbounds it just left get their daemon config rewritten too. settings travels as the JSON-encoded string the panel convention uses, with exactly one client entry; membershipIds arrive as repeated form keys.',
+          "Always posts the account's ENTIRE membership set — this route's contract is that the posted set is the account's set, not a delta. Inbounds it just left get their daemon config rewritten too. settings travels as the JSON-encoded string the panel convention uses, with exactly one client entry; membershipIds arrive as repeated form keys.",
         params: [
           {
             name: 'settings',
@@ -3250,7 +3268,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/inbounds/delAccount/:email',
         summary:
-          'Delete an account that no inbound serves. Refuses an account still served by an inbound — delete it there instead. A reseller is refunded for the account\'s unused balance before the row goes away.',
+          "Delete an account that no inbound serves. Refuses an account still served by an inbound — delete it there instead. A reseller is refunded for the account's unused balance before the row goes away.",
         params: [{ name: 'email', in: 'path', type: 'string', desc: 'Account email.' }],
         response: '{\n  "success": true,\n  "msg": "Inbound client has been deleted."\n}',
         errorResponse:
@@ -3260,11 +3278,16 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/inbounds/:id/setMembershipEnable/:email',
         summary:
-          'Switch one account on or off on ONE inbound. Only this inbound\'s entry changes; every protocol daemon the account still rides gets a reconcile pass.',
+          "Switch one account on or off on ONE inbound. Only this inbound's entry changes; every protocol daemon the account still rides gets a reconcile pass.",
         params: [
           { name: 'id', in: 'path', type: 'integer', desc: 'Inbound id.' },
           { name: 'email', in: 'path', type: 'string', desc: 'Account email.' },
-          { name: 'enable', in: 'body (form)', type: 'boolean', desc: 'true to enable the membership, false to disable it.' },
+          {
+            name: 'enable',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'true to enable the membership, false to disable it.',
+          },
         ],
         response: '{\n  "success": true,\n  "msg": "Inbound client has been updated."\n}',
       },
@@ -3272,7 +3295,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/inbounds/bulkMembership',
         summary:
-          'Put the selected accounts ON a set of inbounds, or take them OFF. Resellers are refused: which inbounds serve an account is the admin\'s call.',
+          "Put the selected accounts ON a set of inbounds, or take them OFF. Resellers are refused: which inbounds serve an account is the admin's call.",
         params: [
           {
             name: 'data',
@@ -3331,9 +3354,16 @@ export const sections: readonly Section[] = [
           'Generate and download an OpenVPN client profile (.ovpn) for the inbound, udp or tcp.',
         params: [
           { name: 'id', in: 'path', type: 'integer', desc: 'Inbound id.' },
-          { name: 'proto', in: 'path', type: 'string', enum: ['udp', 'tcp'], desc: 'Transport the profile connects over.' },
+          {
+            name: 'proto',
+            in: 'path',
+            type: 'string',
+            enum: ['udp', 'tcp'],
+            desc: 'Transport the profile connects over.',
+          },
         ],
-        response: 'The profile text, as application/x-openvpn-profile with a client-<proto>.ovpn attachment name. NOT the JSON envelope.',
+        response:
+          'The profile text, as application/x-openvpn-profile with a client-<proto>.ovpn attachment name. NOT the JSON envelope.',
       },
       {
         method: 'POST',
@@ -3382,19 +3412,21 @@ export const sections: readonly Section[] = [
         path: '/panel/api/inbounds/:id/generate-ikev2-cert',
         summary:
           'Generate a self-signed RSA CA + server certificate for IKEv2 (strongSwan). The CA comes back too: clients must import it unless a publicly-trusted cert is used.',
-        response: '{\n  "success": true,\n  "obj": { "certificate": "...", "key": "...", "caCert": "..." }\n}',
+        response:
+          '{\n  "success": true,\n  "obj": { "certificate": "...", "key": "...", "caCert": "..." }\n}',
       },
       {
         method: 'POST',
         path: '/panel/api/inbounds/generate-ikev2-cert',
         summary: 'Same generation for a not-yet-saved inbound.',
-        response: '{\n  "success": true,\n  "obj": { "certificate": "...", "key": "...", "caCert": "..." }\n}',
+        response:
+          '{\n  "success": true,\n  "obj": { "certificate": "...", "key": "...", "caCert": "..." }\n}',
       },
       {
         method: 'POST',
         path: '/panel/api/inbounds/check-ikev2-cert',
         summary:
-          'Inspect a proposed IKEv2 server certificate\'s public-key type and return a device-compatibility warning (non-RSA → iOS silently rejects). Non-blocking: the UI surfaces the warning; saving is not prevented.',
+          "Inspect a proposed IKEv2 server certificate's public-key type and return a device-compatibility warning (non-RSA → iOS silently rejects). Non-blocking: the UI surfaces the warning; saving is not prevented.",
         params: [
           {
             name: 'settings',
@@ -3409,7 +3441,7 @@ export const sections: readonly Section[] = [
         method: 'GET',
         path: '/panel/api/inbounds/:id/wgc-configs',
         summary:
-          'Render the WireGuard (wg-c) client configuration(s) for one account (?email=): one .conf per device (K = the account\'s User Limit), server-minted keys, panel-access host as endpoint. Mints/persists any missing keypairs first.',
+          "Render the WireGuard (wg-c) client configuration(s) for one account (?email=): one .conf per device (K = the account's User Limit), server-minted keys, panel-access host as endpoint. Mints/persists any missing keypairs first.",
         params: [
           { name: 'id', in: 'path', type: 'integer', desc: 'Inbound id.' },
           { name: 'email', in: 'query', type: 'string', desc: 'Account email.' },
@@ -3433,7 +3465,7 @@ export const sections: readonly Section[] = [
         method: 'GET',
         path: '/panel/api/inbounds/:id/gre-configs',
         summary:
-          'Render one GRE account\'s per-peer router configuration(s) (?email=): WireGuard-style .conf text plus a shell snippet per pinned peer. Reconciles any missing peers first.',
+          "Render one GRE account's per-peer router configuration(s) (?email=): WireGuard-style .conf text plus a shell snippet per pinned peer. Reconciles any missing peers first.",
         params: [
           { name: 'id', in: 'path', type: 'integer', desc: 'Inbound id.' },
           { name: 'email', in: 'query', type: 'string', desc: 'Account email.' },
@@ -3457,7 +3489,7 @@ export const sections: readonly Section[] = [
         method: 'GET',
         path: '/panel/api/inbounds/:id/ikev2-remote-id',
         summary:
-          'Resolve an ikev2 inbound\'s Remote ID / Server Identity: the IKE identity the server presents, and the SAN the self-signed generator issued the server cert for.',
+          "Resolve an ikev2 inbound's Remote ID / Server Identity: the IKE identity the server presents, and the SAN the self-signed generator issued the server cert for.",
         params: [{ name: 'id', in: 'path', type: 'integer', desc: 'Inbound id.' }],
         response: '{\n  "success": true,\n  "obj": { "remoteId": "203.0.113.7" }\n}',
       },
@@ -3465,7 +3497,7 @@ export const sections: readonly Section[] = [
         method: 'GET',
         path: '/panel/api/inbounds/:id/addressing',
         summary:
-          'Everything readable about one inbound\'s address plane: its pool ranges, the User Limit resolution (and WHICH rule produced it), capacity/max/used, and every account\'s slot and tunnel address(es). For a reseller the report is narrowed to their own accounts first. Xray-native protocols and the relays (mtproto, ssh) hand out no client address and answer with a plain refusal text, not an empty pool.',
+          "Everything readable about one inbound's address plane: its pool ranges, the User Limit resolution (and WHICH rule produced it), capacity/max/used, and every account's slot and tunnel address(es). For a reseller the report is narrowed to their own accounts first. Xray-native protocols and the relays (mtproto, ssh) hand out no client address and answer with a plain refusal text, not an empty pool.",
         params: [{ name: 'id', in: 'path', type: 'integer', desc: 'Inbound id.' }],
         response:
           '{\n  "success": true,\n  "obj": {\n    "inboundId": 3,\n    "protocol": "wg-c",\n    "ranges": ["10.0.5.2-10.0.5.254"],\n    "subnets": ["10.0.5"],\n    "userLimit": { "posted": 2, "effective": 2, "rule": "explicit" },\n    "capacity": 62,\n    "maxAccounts": 0,\n    "used": 4,\n    "accounts": [{ "email": "user1", "slot": 0, "addresses": ["10.0.5.2/32", "10.0.5.3/32"] }]\n  }\n}',
@@ -3490,36 +3522,67 @@ export const sections: readonly Section[] = [
       {
         method: 'GET',
         path: '/panel/api/admins/list',
-        summary: 'Every admin with their permission slugs and inbound grant count. Password hashes never leave the server.',
+        summary:
+          'Every admin with their permission slugs and inbound grant count. Password hashes never leave the server.',
         response:
           '{\n  "success": true,\n  "obj": [\n    {\n      "id": 2,\n      "username": "ops",\n      "nickname": "Ops",\n      "isSuperAdmin": false,\n      "enable": true,\n      "twoFactorEnable": false,\n      "permissions": ["accessInbounds", "createClient", "editClient"],\n      "inboundCount": 4,\n      "inboundIds": [3, 9]\n    }\n  ]\n}',
       },
       {
         method: 'GET',
         path: '/panel/api/admins/permissions',
-        summary: 'The canonical permission slug list, in the render order the Admins UI should use.',
+        summary:
+          'The canonical permission slug list, in the render order the Admins UI should use.',
         response:
           '{\n  "success": true,\n  "obj": [\n    { "slug": "accessInbounds" },\n    { "slug": "createInbound" },\n    { "slug": "deleteInbound" },\n    { "slug": "createClient" },\n    { "slug": "editClient" },\n    { "slug": "deleteClient" },\n    { "slug": "bulkOperation" },\n    { "slug": "accessCoreSettings" },\n    { "slug": "accessXraySettings" },\n    { "slug": "accessPanelSettings" },\n    { "slug": "manageResellers" },\n    { "slug": "accessOverview" },\n    { "slug": "manageOverview" }\n  ]\n}',
       },
       {
         method: 'GET',
         path: '/panel/api/admins/inbounds',
-        summary: 'Every inbound as a brief ({id, remark, protocol, port}), for the access checklist in the admin modal.',
+        summary:
+          'Every inbound as a brief ({id, remark, protocol, port}), for the access checklist in the admin modal.',
         response:
           '{\n  "success": true,\n  "obj": [\n    { "id": 3, "remark": "WGC-51820", "protocol": "wg-c", "port": 51820 }\n  ]\n}',
       },
       {
         method: 'POST',
         path: '/panel/api/admins/add',
-        summary: 'Create an admin. Passwords arrive form-urlencoded like every panel POST; permissions and inboundIds are repeated keys.',
+        summary:
+          'Create an admin. Passwords arrive form-urlencoded like every panel POST; permissions and inboundIds are repeated keys.',
         params: [
           { name: 'username', in: 'body (form)', type: 'string', desc: 'Login name, unique.' },
           { name: 'password', in: 'body (form)', type: 'string', desc: 'Initial password.' },
-          { name: 'nickname', in: 'body (form)', type: 'string', desc: 'Display name.', optional: true },
-          { name: 'enable', in: 'body (form)', type: 'boolean', desc: 'Whether the admin may log in.' },
-          { name: 'isSuperAdmin', in: 'body (form)', type: 'boolean', desc: 'Grant the bypass-everything role.', optional: true },
-          { name: 'permissions', in: 'body (form)', type: 'string[]', desc: 'Repeated permission slugs. Unknown slugs are dropped, not an error.' },
-          { name: 'inboundIds', in: 'body (form)', type: 'string[]', desc: 'Repeated inbound ids the admin may see. A blank entry means none.' },
+          {
+            name: 'nickname',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'Display name.',
+            optional: true,
+          },
+          {
+            name: 'enable',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'Whether the admin may log in.',
+          },
+          {
+            name: 'isSuperAdmin',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'Grant the bypass-everything role.',
+            optional: true,
+          },
+          {
+            name: 'permissions',
+            in: 'body (form)',
+            type: 'string[]',
+            desc: 'Repeated permission slugs. Unknown slugs are dropped, not an error.',
+          },
+          {
+            name: 'inboundIds',
+            in: 'body (form)',
+            type: 'string[]',
+            desc: 'Repeated inbound ids the admin may see. A blank entry means none.',
+          },
         ],
         response: '{\n  "success": true,\n  "msg": "Admin added"\n}',
       },
@@ -3531,19 +3594,53 @@ export const sections: readonly Section[] = [
         params: [
           { name: 'id', in: 'path', type: 'integer', desc: 'Admin id.' },
           { name: 'username', in: 'body (form)', type: 'string', desc: 'Login name.' },
-          { name: 'password', in: 'body (form)', type: 'string', desc: 'Empty keeps the existing password.', optional: true },
-          { name: 'nickname', in: 'body (form)', type: 'string', desc: 'Display name.', optional: true },
-          { name: 'enable', in: 'body (form)', type: 'boolean', desc: 'Whether the admin may log in.' },
-          { name: 'isSuperAdmin', in: 'body (form)', type: 'boolean', desc: 'Whether the admin bypasses the permission mask.', optional: true },
-          { name: 'permissions', in: 'body (form)', type: 'string[]', desc: 'Repeated permission slugs (replaces the set).' },
-          { name: 'inboundIds', in: 'body (form)', type: 'string[]', desc: 'Repeated inbound ids (replaces the set).' },
+          {
+            name: 'password',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'Empty keeps the existing password.',
+            optional: true,
+          },
+          {
+            name: 'nickname',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'Display name.',
+            optional: true,
+          },
+          {
+            name: 'enable',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'Whether the admin may log in.',
+          },
+          {
+            name: 'isSuperAdmin',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'Whether the admin bypasses the permission mask.',
+            optional: true,
+          },
+          {
+            name: 'permissions',
+            in: 'body (form)',
+            type: 'string[]',
+            desc: 'Repeated permission slugs (replaces the set).',
+          },
+          {
+            name: 'inboundIds',
+            in: 'body (form)',
+            type: 'string[]',
+            desc: 'Repeated inbound ids (replaces the set).',
+          },
         ],
         response: '{\n  "success": true,\n  "msg": "Admin updated"\n}',
       },
       {
         method: 'POST',
         path: '/panel/api/admins/del/:id',
-        summary: 'Delete an admin. Deleting yourself is refused. The service refuses to delete the last enabled super admin.',
+        summary:
+          'Delete an admin. Deleting yourself is refused. The service refuses to delete the last enabled super admin.',
         params: [{ name: 'id', in: 'path', type: 'integer', desc: 'Admin id.' }],
         response: '{\n  "success": true,\n  "msg": "Admin deleted"\n}',
       },
@@ -3579,7 +3676,7 @@ export const sections: readonly Section[] = [
         method: 'GET',
         path: '/panel/api/resellers/inbounds',
         summary:
-          'The inbounds a reseller may be given access to ({id, remark, protocol, port}). Intersected with the CALLER\'s own grants, because this route is reachable by a non-super admin; the save re-checks anyway.',
+          "The inbounds a reseller may be given access to ({id, remark, protocol, port}). Intersected with the CALLER's own grants, because this route is reachable by a non-super admin; the save re-checks anyway.",
         response:
           '{\n  "success": true,\n  "obj": [\n    { "id": 3, "remark": "WGC-51820", "protocol": "wg-c", "port": 51820 }\n  ]\n}',
       },
@@ -3591,17 +3688,80 @@ export const sections: readonly Section[] = [
         params: [
           { name: 'username', in: 'body (form)', type: 'string', desc: 'Login name, unique.' },
           { name: 'password', in: 'body (form)', type: 'string', desc: 'Initial password.' },
-          { name: 'nickname', in: 'body (form)', type: 'string', desc: 'Display name.', optional: true },
-          { name: 'enable', in: 'body (form)', type: 'boolean', desc: 'Whether the reseller may log in.' },
-          { name: 'unlimited', in: 'body (form)', type: 'boolean', desc: 'No balance ceiling (house reseller).', optional: true },
-          { name: 'allowanceGb', in: 'body (form)', type: 'integer', desc: 'Starting allowance in whole GB (create only).' },
-          { name: 'daysPerGb', in: 'body (form)', type: 'integer', desc: 'Forced expiry rule: each GB sold expires after this many days.', optional: true },
-          { name: 'minCreateGb', in: 'body (form)', type: 'integer', desc: 'Minimum GB per account creation.', optional: true },
-          { name: 'minAddGb', in: 'body (form)', type: 'integer', desc: 'Minimum GB per top-up.', optional: true },
-          { name: 'allowExternalProxy', in: 'body (form)', type: 'boolean', desc: 'May sell on external-proxy endpoints.', optional: true },
-          { name: 'allowOverview', in: 'body (form)', type: 'boolean', desc: 'May open the panel overview.', optional: true },
-          { name: 'allowOverviewManage', in: 'body (form)', type: 'boolean', desc: 'May act on the overview (needs allowOverview).', optional: true },
-          { name: 'inboundIds', in: 'body (form)', type: 'string[]', desc: 'Repeated inbound ids the reseller may sell on. A blank entry means none.' },
+          {
+            name: 'nickname',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'Display name.',
+            optional: true,
+          },
+          {
+            name: 'enable',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'Whether the reseller may log in.',
+          },
+          {
+            name: 'unlimited',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'No balance ceiling (house reseller).',
+            optional: true,
+          },
+          {
+            name: 'allowanceGb',
+            in: 'body (form)',
+            type: 'integer',
+            desc: 'Starting allowance in whole GB (create only).',
+          },
+          {
+            name: 'daysPerGb',
+            in: 'body (form)',
+            type: 'integer',
+            desc: 'Forced expiry rule: each GB sold expires after this many days.',
+            optional: true,
+          },
+          {
+            name: 'minCreateGb',
+            in: 'body (form)',
+            type: 'integer',
+            desc: 'Minimum GB per account creation.',
+            optional: true,
+          },
+          {
+            name: 'minAddGb',
+            in: 'body (form)',
+            type: 'integer',
+            desc: 'Minimum GB per top-up.',
+            optional: true,
+          },
+          {
+            name: 'allowExternalProxy',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'May sell on external-proxy endpoints.',
+            optional: true,
+          },
+          {
+            name: 'allowOverview',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'May open the panel overview.',
+            optional: true,
+          },
+          {
+            name: 'allowOverviewManage',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'May act on the overview (needs allowOverview).',
+            optional: true,
+          },
+          {
+            name: 'inboundIds',
+            in: 'body (form)',
+            type: 'string[]',
+            desc: 'Repeated inbound ids the reseller may sell on. A blank entry means none.',
+          },
         ],
         response: '{\n  "success": true,\n  "msg": "Reseller added"\n}',
       },
@@ -3609,22 +3769,92 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/resellers/update/:id',
         summary:
-          'Update a reseller\'s profile. An empty password keeps the existing one. allowanceGb is IGNORED here — the balance moves only through recharges, so history stays honest.',
+          "Update a reseller's profile. An empty password keeps the existing one. allowanceGb is IGNORED here — the balance moves only through recharges, so history stays honest.",
         params: [
           { name: 'id', in: 'path', type: 'integer', desc: 'Reseller id.' },
           { name: 'username', in: 'body (form)', type: 'string', desc: 'Login name.' },
-          { name: 'password', in: 'body (form)', type: 'string', desc: 'Empty keeps the existing password.', optional: true },
-          { name: 'nickname', in: 'body (form)', type: 'string', desc: 'Display name.', optional: true },
-          { name: 'enable', in: 'body (form)', type: 'boolean', desc: 'Whether the reseller may log in.' },
-          { name: 'unlimited', in: 'body (form)', type: 'boolean', desc: 'No balance ceiling.', optional: true },
-          { name: 'allowanceGb', in: 'body (form)', type: 'integer', desc: 'Ignored on update (use recharge).', optional: true },
-          { name: 'daysPerGb', in: 'body (form)', type: 'integer', desc: 'Forced expiry rule (0 disables).', optional: true },
-          { name: 'minCreateGb', in: 'body (form)', type: 'integer', desc: 'Minimum GB per account creation.', optional: true },
-          { name: 'minAddGb', in: 'body (form)', type: 'integer', desc: 'Minimum GB per top-up.', optional: true },
-          { name: 'allowExternalProxy', in: 'body (form)', type: 'boolean', desc: 'May sell on external-proxy endpoints.', optional: true },
-          { name: 'allowOverview', in: 'body (form)', type: 'boolean', desc: 'May open the panel overview.', optional: true },
-          { name: 'allowOverviewManage', in: 'body (form)', type: 'boolean', desc: 'May act on the overview (needs allowOverview).', optional: true },
-          { name: 'inboundIds', in: 'body (form)', type: 'string[]', desc: 'Repeated inbound ids (replaces the set).' },
+          {
+            name: 'password',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'Empty keeps the existing password.',
+            optional: true,
+          },
+          {
+            name: 'nickname',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'Display name.',
+            optional: true,
+          },
+          {
+            name: 'enable',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'Whether the reseller may log in.',
+          },
+          {
+            name: 'unlimited',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'No balance ceiling.',
+            optional: true,
+          },
+          {
+            name: 'allowanceGb',
+            in: 'body (form)',
+            type: 'integer',
+            desc: 'Ignored on update (use recharge).',
+            optional: true,
+          },
+          {
+            name: 'daysPerGb',
+            in: 'body (form)',
+            type: 'integer',
+            desc: 'Forced expiry rule (0 disables).',
+            optional: true,
+          },
+          {
+            name: 'minCreateGb',
+            in: 'body (form)',
+            type: 'integer',
+            desc: 'Minimum GB per account creation.',
+            optional: true,
+          },
+          {
+            name: 'minAddGb',
+            in: 'body (form)',
+            type: 'integer',
+            desc: 'Minimum GB per top-up.',
+            optional: true,
+          },
+          {
+            name: 'allowExternalProxy',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'May sell on external-proxy endpoints.',
+            optional: true,
+          },
+          {
+            name: 'allowOverview',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'May open the panel overview.',
+            optional: true,
+          },
+          {
+            name: 'allowOverviewManage',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'May act on the overview (needs allowOverview).',
+            optional: true,
+          },
+          {
+            name: 'inboundIds',
+            in: 'body (form)',
+            type: 'string[]',
+            desc: 'Repeated inbound ids (replaces the set).',
+          },
         ],
         response: '{\n  "success": true,\n  "msg": "Reseller updated"\n}',
       },
@@ -3635,7 +3865,13 @@ export const sections: readonly Section[] = [
           'Delete a reseller. With accounts still owned, `mode` carries the caller\'s answer: "keep" hands the accounts to the house (refund-free), "cascade" deletes them and reconfigures every affected daemon. Empty still refuses — the destructive path is never the default.',
         params: [
           { name: 'id', in: 'path', type: 'integer', desc: 'Reseller id.' },
-          { name: 'mode', in: 'body (form)', type: 'string', enum: ['keep', 'cascade'], desc: 'What happens to accounts the reseller still owns.' },
+          {
+            name: 'mode',
+            in: 'body (form)',
+            type: 'string',
+            enum: ['keep', 'cascade'],
+            desc: 'What happens to accounts the reseller still owns.',
+          },
         ],
         response: '{\n  "success": true,\n  "msg": "Reseller deleted"\n}',
       },
@@ -3643,7 +3879,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/resellers/recharge/:id',
         summary:
-          'Move a reseller\'s allowance by whole GB. Signed on purpose: a negative number takes balance back, and the resulting allowance clamps at zero rather than wrapping.',
+          "Move a reseller's allowance by whole GB. Signed on purpose: a negative number takes balance back, and the resulting allowance clamps at zero rather than wrapping.",
         params: [
           { name: 'id', in: 'path', type: 'integer', desc: 'Reseller id.' },
           { name: 'gb', in: 'body (form)', type: 'integer', desc: 'Signed GB delta.' },
@@ -3663,7 +3899,7 @@ export const sections: readonly Section[] = [
         method: 'GET',
         path: '/panel/api/core/status',
         summary:
-          'Every core\'s status plus the host/kernel system status, whether the VPN backend has been provisioned, and any pending reboot (with the modules and package that require it).',
+          "Every core's status plus the host/kernel system status, whether the VPN backend has been provisioned, and any pending reboot (with the modules and package that require it).",
         response:
           '{\n  "success": true,\n  "obj": {\n    "cores": [\n      { "name": "xray", "state": "running", "detail": "", "version": "v25.x.x", "inbounds": 3, "extra": {} }\n    ],\n    "system": {\n      "ipForward": true,\n      "nftables": true,\n      "iproute": true,\n      "modules": [{ "name": "nf_tproxy_ipv4", "loaded": true }],\n      "modulesOk": true\n    },\n    "provisioned": true,\n    "missingProtocols": [],\n    "rebootRequired": false,\n    "rebootModules": [],\n    "rebootPkg": ""\n  }\n}',
       },
@@ -3722,7 +3958,8 @@ export const sections: readonly Section[] = [
       {
         method: 'GET',
         path: '/panel/api/core/uninstall-status',
-        summary: 'Live progress of the current/most-recent core uninstall, same console shape as provision-status.',
+        summary:
+          'Live progress of the current/most-recent core uninstall, same console shape as provision-status.',
         response:
           '{\n  "success": true,\n  "obj": { "running": false, "done": true, "steps": [], "kept": ["inbound 7"], "cores": ["sstp"] }\n}',
       },
@@ -3737,7 +3974,14 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/core/restart/:core',
         summary: 'Restart the daemon(s) of the given core.',
-        params: [{ name: 'core', in: 'path', type: 'string', desc: 'Core name, e.g. xray, l2tp, openvpn.' }],
+        params: [
+          {
+            name: 'core',
+            in: 'path',
+            type: 'string',
+            desc: 'Core name, e.g. xray, l2tp, openvpn.',
+          },
+        ],
         response: '{\n  "success": true,\n  "msg": "Core restarted"\n}',
       },
       {
@@ -3749,14 +3993,15 @@ export const sections: readonly Section[] = [
       {
         method: 'POST',
         path: '/panel/api/core/stop/:core',
-        summary: 'Stop the given core, where stopping is supported (xray, l2tp, pptp, openvpn, radius).',
+        summary:
+          'Stop the given core, where stopping is supported (xray, l2tp, pptp, openvpn, radius).',
         params: [{ name: 'core', in: 'path', type: 'string', desc: 'Core name.' }],
         response: '{\n  "success": true,\n  "msg": "Core stopped"\n}',
       },
       {
         method: 'GET',
         path: '/panel/api/core/logs/:core',
-        summary: 'Recent captured output for a core\'s process(es) (journalctl, filtered).',
+        summary: "Recent captured output for a core's process(es) (journalctl, filtered).",
         params: [{ name: 'core', in: 'path', type: 'string', desc: 'Core name.' }],
         response: '{\n  "success": true,\n  "obj": "Jun 01 10:00:00 host xl2tpd[123]: ..."\n}',
       },
@@ -3773,11 +4018,21 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/core/config/:core',
         summary:
-          'Store an operator override for one of a core\'s config files and restart the core so it lands on disk (super-admin only — a config can name a script for a root daemon to execute). The file is addressed by inbound + file NAME, never by path, so the endpoint cannot be steered into writing somewhere it does not already write. Responds with the core\'s fresh logs and the refreshed target list so a failed edit is visible in the same call.',
+          "Store an operator override for one of a core's config files and restart the core so it lands on disk (super-admin only — a config can name a script for a root daemon to execute). The file is addressed by inbound + file NAME, never by path, so the endpoint cannot be steered into writing somewhere it does not already write. Responds with the core's fresh logs and the refreshed target list so a failed edit is visible in the same call.",
         params: [
           { name: 'core', in: 'path', type: 'string', desc: 'Core name.' },
-          { name: 'inboundId', in: 'body (form)', type: 'integer', desc: 'Owning inbound id, 0 for a core-wide file.' },
-          { name: 'file', in: 'body (form)', type: 'string', desc: 'Target file discriminator (the File field from the GET).' },
+          {
+            name: 'inboundId',
+            in: 'body (form)',
+            type: 'integer',
+            desc: 'Owning inbound id, 0 for a core-wide file.',
+          },
+          {
+            name: 'file',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'Target file discriminator (the File field from the GET).',
+          },
           {
             name: 'mode',
             in: 'body (form)',
@@ -3804,7 +4059,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/xray/vpnoutbound/:action',
         summary:
-          'Drive the operator VPN client tunnels: action=list | kinds | save | delete | status. A save creates or replaces the tunnel named by tag; `via` optionally carries this tunnel through another vpn tunnel\'s transport. The response to save returns the interface the driver picked, the only place it is visible.',
+          "Drive the operator VPN client tunnels: action=list | kinds | save | delete | status. A save creates or replaces the tunnel named by tag; `via` optionally carries this tunnel through another vpn tunnel's transport. The response to save returns the interface the driver picked, the only place it is visible.",
         params: [
           {
             name: 'action',
@@ -3819,20 +4074,43 @@ export const sections: readonly Section[] = [
             type: 'string',
             desc: 'Tunnel tag (unique). Required for save/delete/status.',
           },
-          { name: 'kind', in: 'body (form)', type: 'string', desc: 'Outbound protocol from the kinds picker. Required for save.', optional: true },
-          { name: 'remark', in: 'body (form)', type: 'string', desc: 'Display label.', optional: true },
-          { name: 'enable', in: 'body (form)', type: 'boolean', desc: 'Whether the tunnel is active. Default true.', optional: true },
-          { name: 'via', in: 'body (form)', type: 'string', desc: 'Tag of another vpn tunnel carrying this one\'s outer transport. Blank = direct.', optional: true },
+          {
+            name: 'kind',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'Outbound protocol from the kinds picker. Required for save.',
+            optional: true,
+          },
+          {
+            name: 'remark',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'Display label.',
+            optional: true,
+          },
+          {
+            name: 'enable',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'Whether the tunnel is active. Default true.',
+            optional: true,
+          },
+          {
+            name: 'via',
+            in: 'body (form)',
+            type: 'string',
+            desc: "Tag of another vpn tunnel carrying this one's outer transport. Blank = direct.",
+            optional: true,
+          },
           {
             name: 'settings',
             in: 'body (form)',
             type: 'string',
-            desc: 'JSON blob of the protocol\'s settings (wireguard/awg peers, gre endpoints, ssh auth, ...). Must parse as JSON when non-empty.',
+            desc: "JSON blob of the protocol's settings (wireguard/awg peers, gre endpoints, ssh auth, ...). Must parse as JSON when non-empty.",
             optional: true,
           },
         ],
-        response:
-          '{\n  "success": true,\n  "obj": { "iface": "px-wgc0" }\n}',
+        response: '{\n  "success": true,\n  "obj": { "iface": "px-wgc0" }\n}',
         errorResponse: '{\n  "success": false,\n  "msg": "settings is not valid JSON"\n}',
       },
       {
@@ -3848,16 +4126,72 @@ export const sections: readonly Section[] = [
             enum: ['list', 'save', 'delete', 'status'],
             desc: 'list = tunnel list; save = upsert from the form fields; delete = remove by tag (form); status = is the tunnel up, with recent log text.',
           },
-          { name: 'tag', in: 'body (form)', type: 'string', desc: 'Tunnel tag (unique). Required for save/delete/status.' },
-          { name: 'remark', in: 'body (form)', type: 'string', desc: 'Display label.', optional: true },
-          { name: 'address', in: 'body (form)', type: 'string', desc: 'SSH server host. Required for save.' },
-          { name: 'port', in: 'body (form)', type: 'integer', desc: 'SSH server port. Required for save.' },
-          { name: 'username', in: 'body (form)', type: 'string', desc: 'SSH user. Required for save.' },
-          { name: 'authType', in: 'body (form)', type: 'string', enum: ['password', 'privateKey'], desc: 'Auth mode. Required for save.' },
-          { name: 'password', in: 'body (form)', type: 'string', desc: 'Password when authType=password.', optional: true },
-          { name: 'privateKey', in: 'body (form)', type: 'string', desc: 'PEM private key when authType=privateKey.', optional: true },
-          { name: 'passphrase', in: 'body (form)', type: 'string', desc: 'Key passphrase, when set.', optional: true },
-          { name: 'knownHost', in: 'body (form)', type: 'string', desc: 'SHA256/MD5 host-key fingerprint pin; empty = TOFU.', optional: true },
+          {
+            name: 'tag',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'Tunnel tag (unique). Required for save/delete/status.',
+          },
+          {
+            name: 'remark',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'Display label.',
+            optional: true,
+          },
+          {
+            name: 'address',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'SSH server host. Required for save.',
+          },
+          {
+            name: 'port',
+            in: 'body (form)',
+            type: 'integer',
+            desc: 'SSH server port. Required for save.',
+          },
+          {
+            name: 'username',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'SSH user. Required for save.',
+          },
+          {
+            name: 'authType',
+            in: 'body (form)',
+            type: 'string',
+            enum: ['password', 'privateKey'],
+            desc: 'Auth mode. Required for save.',
+          },
+          {
+            name: 'password',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'Password when authType=password.',
+            optional: true,
+          },
+          {
+            name: 'privateKey',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'PEM private key when authType=privateKey.',
+            optional: true,
+          },
+          {
+            name: 'passphrase',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'Key passphrase, when set.',
+            optional: true,
+          },
+          {
+            name: 'knownHost',
+            in: 'body (form)',
+            type: 'string',
+            desc: 'SHA256/MD5 host-key fingerprint pin; empty = TOFU.',
+            optional: true,
+          },
         ],
         response: '{\n  "success": true,\n  "obj": { "socksPort": 10801 }\n}',
       },

@@ -1,0 +1,30 @@
+import { coerceInboundJsonField } from '@/models/dbinbound';
+import type { VpnInboundRow } from '@/api/queries/useVpnProtocols';
+
+// Structural source: both the slim/full DBInbound instances (edit flow, which
+// hydrates first) and the list's DBInboundRecord projection (accounts/toolbox,
+// which only need id/remark/protocol) satisfy it.
+export interface VpnRowSource {
+  id: number;
+  enable: boolean;
+  remark: string;
+  port: number;
+  protocol: string;
+  listen?: string;
+  settings: unknown;
+}
+
+// The vpn-specific modals (ProtocolInboundModal / ProtocolAccountsCard /
+// ProtocolToolboxModal) take the VpnInboundRow shape the old vpn-protocols page
+// fetched; adapt a row of the unified inbounds list to it.
+export function vpnRowFromRecord(record: VpnRowSource): VpnInboundRow {
+  return {
+    id: record.id,
+    enable: record.enable,
+    remark: record.remark,
+    port: record.port,
+    protocol: record.protocol,
+    listen: typeof record.listen === 'string' ? record.listen : '',
+    settings: (coerceInboundJsonField(record.settings) ?? {}) as Record<string, unknown>,
+  };
+}

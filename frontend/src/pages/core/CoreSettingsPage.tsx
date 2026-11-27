@@ -55,14 +55,8 @@ export default function CoreSettingsPage() {
   const catalog = useVpnCoreCatalog();
   const provisionRunning = useVpnProvisionStatus(consoleOpen && consoleMode === 'provision');
   const uninstallRunning = useVpnUninstallStatus(consoleOpen && consoleMode === 'uninstall');
-  const {
-    restart,
-    restartAll,
-    stop,
-    reboot,
-    startProvision,
-    startUninstall,
-  } = useVpnCoreMutations();
+  const { restart, restartAll, stop, reboot, startProvision, startUninstall } =
+    useVpnCoreMutations();
 
   const onRestart = useCallback(
     async (core: string) => {
@@ -90,14 +84,11 @@ export default function CoreSettingsPage() {
     [modal, stop, messageApi, t],
   );
 
-  const onRestartAll = useCallback(
-    async () => {
-      const msg = await restartAll();
-      if (msg?.success) messageApi.success(t('pages.core.toasts.restarted'));
-      else messageApi.error(msg?.msg || t('somethingWentWrong'));
-    },
-    [restartAll, messageApi, t],
-  );
+  const onRestartAll = useCallback(async () => {
+    const msg = await restartAll();
+    if (msg?.success) messageApi.success(t('pages.core.toasts.restarted'));
+    else messageApi.error(msg?.msg || t('somethingWentWrong'));
+  }, [restartAll, messageApi, t]);
 
   const onReboot = useCallback(() => {
     modal.confirm({
@@ -182,6 +173,7 @@ export default function CoreSettingsPage() {
           <Select
             defaultValue="delete"
             style={{ width: 240 }}
+            aria-label={t('pages.core.uninstallInboundsQuestion')}
             options={[
               { value: 'delete', label: t('pages.core.uninstallDeleteInbounds') },
               { value: 'keep', label: t('pages.core.uninstallKeepInbounds') },
@@ -213,12 +205,12 @@ export default function CoreSettingsPage() {
   const system = status?.system;
   const steps =
     consoleMode === 'provision'
-      ? provisionRunning.data?.steps ?? []
-      : uninstallRunning.data?.steps ?? [];
+      ? (provisionRunning.data?.steps ?? [])
+      : (uninstallRunning.data?.steps ?? []);
   const consoleRunning =
     consoleMode === 'provision'
-      ? provisionRunning.data?.running ?? false
-      : uninstallRunning.data?.running ?? false;
+      ? (provisionRunning.data?.running ?? false)
+      : (uninstallRunning.data?.running ?? false);
   const kept = uninstallRunning.data?.kept ?? [];
 
   const statusColumns: ColumnsType<CoreStatus> = useMemo(
@@ -412,7 +404,7 @@ export default function CoreSettingsPage() {
           }
           width={720}
         >
-          <Spin spinning={consoleRunning}>
+          <Spin spinning={consoleRunning} aria-live="off">
             {steps.length === 0 ? (
               <Result status="info" title={t('pages.core.consoleIdle')} />
             ) : (

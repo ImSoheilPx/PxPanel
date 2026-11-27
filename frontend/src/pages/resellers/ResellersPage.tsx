@@ -27,6 +27,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import AppSidebar from '@/layouts/AppSidebar';
 import { setMessageInstance } from '@/utils/messageBus';
+import { selectTagRender } from '@/components/form';
 import type { InboundBrief, ResellerView } from '@/schemas/api/vpn';
 import {
   useVpnResellerInboundsQuery,
@@ -150,9 +151,7 @@ export default function ResellersPage() {
         <Space wrap size={4}>
           {row.inboundIds.map((id) => {
             const brief = inboundOptions.find((option) => option.id === id);
-            return (
-              <Tag key={id}>{brief ? brief.remark || `#${id}` : `#${id}`}</Tag>
-            );
+            return <Tag key={id}>{brief ? brief.remark || `#${id}` : `#${id}`}</Tag>;
           })}
           {row.inboundIds.length === 0 && '—'}
         </Space>
@@ -275,9 +274,7 @@ export default function ResellersPage() {
             const msg = editing ? await update(editing.id, values) : await add(values);
             if (msg?.success) {
               messageApi.success(
-                editing
-                  ? t('pages.resellers.toasts.updated')
-                  : t('pages.resellers.toasts.added'),
+                editing ? t('pages.resellers.toasts.updated') : t('pages.resellers.toasts.added'),
               );
               setFormOpen(false);
             } else {
@@ -296,6 +293,7 @@ export default function ResellersPage() {
         >
           <InputNumber
             style={{ width: '100%' }}
+            aria-label={t('pages.resellers.recharge')}
             value={rechargeGb}
             onChange={(v) => setRechargeGb(v ?? 0)}
             addonAfter="GB"
@@ -454,6 +452,7 @@ export function ResellerFormModal({
           <Select
             mode="multiple"
             allowClear
+            tagRender={selectTagRender}
             options={inboundOptions.map((option) => ({
               value: option.id,
               label: `${option.remark || `#${option.id}`} (${option.protocol}:${option.port})`,

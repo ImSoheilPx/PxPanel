@@ -3,6 +3,7 @@ module github.com/ImSoheilPx/pxpanel
 go 1.27.1
 
 require (
+	github.com/Jipok/wgctrl-go v1.3.1
 	github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20261116
 	github.com/apernet/quic-go v0.61.1-0.20260806010916-184d081eef3e
 	github.com/gin-contrib/gzip v1.2.10
@@ -38,7 +39,6 @@ require (
 	golang.org/x/sys v0.50.0
 	golang.org/x/text v0.44.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20241231184526-a9ab2273dd10
-	github.com/Jipok/wgctrl-go v1.2.0
 	google.golang.org/grpc v1.86.0-dev
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
