@@ -299,8 +299,10 @@ func TestEveryVpnProtocolMapsToItsCore(t *testing.T) {
 	// And every installable core must be reachable from some protocol, or installing it
 	// is the only thing the operator can ever do with it.
 	served := map[string]bool{}
-	for _, p := range []string{"l2tp", "pptp", "openvpn", "openconnect", "sstp",
-		"ikev2", "wg-c", "awg", "gre", "mtproto"} {
+	for _, p := range []string{
+		"l2tp", "pptp", "openvpn", "openconnect", "sstp",
+		"ikev2", "wg-c", "awg", "gre", "mtproto",
+	} {
 		served[protocolCoreName(p)] = true
 	}
 	for _, core := range installableCores() {

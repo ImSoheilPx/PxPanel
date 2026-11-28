@@ -18,6 +18,7 @@ import (
 	"github.com/ImSoheilPx/pxpanel/internal/database/model"
 	"github.com/ImSoheilPx/pxpanel/internal/logger"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn"
+	"github.com/ImSoheilPx/pxpanel/internal/vpn/defaults"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/ikev2"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/ipsec"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/pkgmgr"
@@ -150,7 +151,7 @@ func systemctlActive(unit string) bool {
 	if !commandExists("systemctl") {
 		return false
 	}
-	out, _ := exec.Command("systemctl", "is-active", unit).Output()
+	out, _ := exec.CommandContext(context.Background(), "systemctl", "is-active", unit).Output()
 	return strings.TrimSpace(string(out)) == "active"
 }
 
@@ -223,7 +224,7 @@ func daemonVersion(name string) string {
 	} else {
 		return ""
 	}
-	out, _ := exec.Command(bin, "--version").CombinedOutput()
+	out, _ := exec.CommandContext(context.Background(), bin, "--version").CombinedOutput()
 	v := daemonVersionRe.FindString(string(out))
 	if v != "" {
 		daemonVersionMu.Lock()
@@ -327,6 +328,7 @@ func (s *CoreService) GetCoresStatus() []CoreStatus {
 		s.awgStatus(),
 		s.greStatus(),
 		s.mtprotoStatus(),
+		s.mtprotoCStatus(),
 		s.sshStatus(),
 		s.radiusStatus(),
 	}
@@ -758,6 +760,27 @@ func (s *CoreService) mtprotoStatus() CoreStatus {
 	return cs
 }
 
+// mtprotoCStatus reports the MTProto-C (telemt) core. Both mtproto planes share
+// one daemon binary and one supervision prefix, so this row is the mtproto
+// status scoped to the mtproto-c inbounds: same availability probe, same
+// liveness signal, own inbound count.
+func (s *CoreService) mtprotoCStatus() CoreStatus {
+	cs := s.mtprotoStatus()
+	cs.Name = "mtproto-c"
+	inbounds, _ := s.mtproto.GetMtprotoInbounds()
+	n := 0
+	for _, in := range inbounds {
+		if in.Protocol == defaults.ProtoMTProtoC {
+			n++
+		}
+	}
+	cs.Inbounds = n
+	if n == 0 {
+		cs.State = CoreIdle
+	}
+	return cs
+}
+
 func (s *CoreService) radiusStatus() CoreStatus {
 	cs := CoreStatus{Name: "radius"}
 	// RADIUS is embedded in the panel binary, so its version is the panel's.
@@ -1122,6 +1145,13 @@ func (s *CoreService) inboundCountsByCore() map[string]int {
 	add("gre", len(gre), err)
 	mt, err := s.mtproto.GetMtprotoInbounds()
 	add("mtproto", len(mt), err)
+	mtc := 0
+	for _, in := range mt {
+		if in.Protocol == defaults.ProtoMTProtoC {
+			mtc++
+		}
+	}
+	add("mtproto-c", mtc, err)
 	ssh, err := s.ssh.GetSshInbounds()
 	add("ssh", len(ssh), err)
 	return counts

@@ -29,7 +29,9 @@ import (
 
 // vpnSSHProtocol is the vpn-ui SSH relay's protocol string (the in-binary SSH
 // gateway rows created through the VPN surface). Distinct from every Xray-native
-// protocol; paired-socks handled, never rendered natively.
+// protocol; paired-socks handled, never rendered natively. (Kept for the doc
+// reference; the native-render skip now goes through xrayplane.IsRelayProtocol,
+// which covers this string and both mtproto planes.)
 const vpnSSHProtocol = model.Protocol("ssh")
 
 var (
@@ -223,13 +225,16 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 		if inbound.Protocol == model.MTProto || inbound.Protocol == model.AmneziaWG || inbound.Protocol == model.TUIC {
 			continue
 		}
-		// The nine VPN tunnel protocols (vpn-ui lineage) and the SSH relay are
-		// paired inbounds, not native ones: their raw settings handed to Xray as
-		// an inbound of protocol "l2tp" would make the core reject the WHOLE
-		// config and take every other inbound down with it. Their Xray half is
-		// injected after the native render (InjectPairedInbounds below), which is
-		// exactly why this skip exists — vpn-ui GetXrayConfig's same branch.
-		if xrayplane.IsVpnProtocol(inbound.Protocol) || inbound.Protocol == vpnSSHProtocol {
+		// The nine VPN tunnel protocols (vpn-ui lineage), the SSH relay and the
+		// telemt mtproto relay (mtproto-c) are paired inbounds, not native
+		// ones: their raw settings handed to Xray as an inbound of protocol
+		// "l2tp" would make the core reject the WHOLE config and take every
+		// other inbound down with it. Their Xray half is injected after the
+		// native render (InjectPairedInbounds below), which is exactly why this
+		// skip exists — vpn-ui GetXrayConfig's same branch. (The plain mtproto
+		// string is this panel's 3x-ui mtg sidecar plane and never reaches
+		// here as a native row either — it is filtered by model.MTProto above.)
+		if xrayplane.IsVpnProtocol(inbound.Protocol) || xrayplane.IsRelayProtocol(inbound.Protocol) {
 			continue
 		}
 		if err := normalizeVlessFallbacks(inbound); err != nil {

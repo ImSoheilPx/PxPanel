@@ -65,6 +65,12 @@ const MULTI_CLIENT_PROTOCOLS = new Set([
   'hysteria',
   'wireguard',
   'mtproto',
+  // The vpn-ui relay protocols: both keep a multi-client settings.clients[]
+  // array (the accounts layer mirrors it), so a client can attach to them
+  // exactly like the native set. mtproto-c is the vpn-ui telemt plane (the
+  // plain mtproto string stays the 3x-ui mtg sidecar).
+  'ssh',
+  'mtproto-c',
   'amneziawg',
   'tuic',
   'masque',
@@ -437,7 +443,9 @@ export default function ClientFormModal({
   const mtprotoIds = useMemo(() => {
     const ids = new Set<number>();
     for (const row of inbounds || []) {
-      if (row && row.protocol === 'mtproto') ids.add(row.id);
+      // Both mtproto planes share the secret credential: plain mtproto (the
+      // 3x-ui mtg sidecar) and mtproto-c (the vpn-ui telemt plane).
+      if (row && (row.protocol === 'mtproto' || row.protocol === 'mtproto-c')) ids.add(row.id);
     }
     return ids;
   }, [inbounds]);
@@ -445,7 +453,10 @@ export default function ClientFormModal({
   const mtprotoDomain = useMemo(() => {
     for (const id of inboundIds || []) {
       const ib = (inbounds || []).find((row) => row.id === id);
+      // Both mtproto planes carry the FakeTLS domain in their settings
+      // (mtproto-c under the key the telemt shape uses).
       if (ib?.protocol === 'mtproto' && ib.mtprotoDomain) return ib.mtprotoDomain;
+      if (ib?.protocol === 'mtproto-c' && ib.mtprotoDomain) return ib.mtprotoDomain;
     }
     return 'www.cloudflare.com';
   }, [inboundIds, inbounds]);

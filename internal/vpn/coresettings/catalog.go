@@ -224,6 +224,19 @@ var coreCatalog = []coreSpec{
 		globs: []string{"/etc/pxpanel/mtproto/server-*"},
 	},
 	{
+		// MTProto-C is the SAME telemt daemon under its own protocol string
+		// (the plain "mtproto" protocol belongs to the 3x-ui mtg sidecar, which
+		// needs nothing from the host). One catalog row per protocol string is
+		// what keeps the Core Settings gate (ProtocolNeedsSetup) honest for the
+		// mtproto-c inbounds, and the install/uninstall state is shared with
+		// the mtproto row through the same provisioned-protocol record.
+		name: "mtproto-c", title: "MTProto-C (telemt)", backend: "telemt",
+		desc:    "Telegram MTProto proxy (vpn-ui telemt plane)",
+		daemons: []string{"telemt"},
+		paths:   []string{"/etc/pxpanel/mtproto"},
+		globs:   []string{"/etc/pxpanel/mtproto/server-*"},
+	},
+	{
 		name: "ssh", title: "SSH", backend: "Built-in (pxpanel)",
 		desc: "SSH tunnel gateway, served by the panel itself", builtin: true,
 	},

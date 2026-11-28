@@ -24,11 +24,12 @@ import (
 )
 
 // isVpnSurfaceProtocol reports whether an inbound belongs to the vpn-ui protocol
-// family (the nine tunnel protocols or the SSH relay). MTProto is deliberately
+// family (the nine tunnel protocols, the SSH relay and the telemt mtproto relay
+// under its mtproto-c string). The plain "mtproto" string is deliberately
 // excluded: this panel's mtproto plane is the v3 sidecar (internal/mtproto), and
 // the vpn-ui telemt stack stays unlinked from those rows.
 func isVpnSurfaceProtocol(p model.Protocol) bool {
-	return xrayplane.IsVpnProtocol(p) || p == protoSSH
+	return xrayplane.IsVpnProtocol(p) || xrayplane.IsRelayProtocol(p)
 }
 
 // vpnAdaptNewInbound runs the vpn-ui add-path adaptations on a bound inbound and,

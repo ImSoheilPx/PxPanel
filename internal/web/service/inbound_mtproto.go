@@ -7,6 +7,8 @@ import (
 	"github.com/ImSoheilPx/pxpanel/internal/database/model"
 	"github.com/ImSoheilPx/pxpanel/internal/logger"
 	"github.com/ImSoheilPx/pxpanel/internal/mtproto"
+	"github.com/ImSoheilPx/pxpanel/internal/vpn/defaults"
+	mtpsvc "github.com/ImSoheilPx/pxpanel/internal/vpn/mtproto"
 )
 
 // DesiredMtprotoInstances derives the mtg sidecar configs this panel should be
@@ -96,6 +98,36 @@ func (s *InboundService) applyLocalMtproto(inboundId int) {
 
 func (s *InboundService) resetMtprotoClientQuota(email string) {
 	s.resetMtprotoClientQuotas([]string{email})
+}
+
+// applyLocalMtprotoC pushes a single mtproto-c (telemt) inbound's current client
+// set to its daemon right after a client edit commits — the mtproto-c twin of
+// applyLocalMtproto. The telemt reconcile (GenerateAllConfigs + the start-if-down
+// EnsureServicesRunning) is the whole apply: telemt hot-reloads [access.*] from
+// the rewritten config without dropping other clients' connections. Failures are
+// logged and swallowed; the 10s vpn traffic job's KillDisabledSessions is the
+// backstop.
+func (s *InboundService) applyLocalMtprotoC(inboundId int) {
+	var mtprotoSvc mtpsvc.MtprotoService
+	inbound, err := s.GetInbound(inboundId)
+	if err != nil || inbound == nil || inbound.Protocol != defaults.ProtoMTProtoC {
+		return
+	}
+	if !inbound.Enable {
+		// Disabled: the reconcile stops the daemon (it is not in the desired set).
+		if err := mtprotoSvc.RestartServices(); err != nil {
+			logger.Debug("mtproto-c: reconcile after disable failed for inbound", inboundId, ":", err)
+		}
+		return
+	}
+	// Regenerate the config (hot-reload carries the client change) and start the
+	// daemon if this edit produced its first usable account.
+	if err := mtprotoSvc.GenerateAllConfigs(); err != nil {
+		logger.Debug("mtproto-c: config regeneration failed for inbound", inboundId, ":", err)
+	}
+	if err := mtprotoSvc.EnsureServicesRunning(); err != nil {
+		logger.Debug("mtproto-c: ensure-running failed for inbound", inboundId, ":", err)
+	}
 }
 
 // resetMtprotoClientQuotas zeroes the sidecar's own quota counter for each local

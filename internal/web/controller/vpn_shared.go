@@ -32,6 +32,7 @@ var (
 	protoAWG          = defaults.ProtoAWG
 	protoGRE          = defaults.ProtoGRE
 	protoMTPROTO      = defaults.ProtoMTProto
+	protoMTPROTOC     = defaults.ProtoMTProtoC
 	protoSSH          = defaults.ProtoSSH
 	protoWireguardXra = model.Protocol("wireguard") // the Xray-native variant
 )

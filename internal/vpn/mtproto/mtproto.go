@@ -280,6 +280,17 @@ func (m *mtprotoSettings) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
+// isMtprotoPlane reports whether an inbound belongs to EITHER mtproto plane:
+// the plain "mtproto" string (this panel's 3x-ui mtg sidecar — read-only here,
+// the manager in internal/mtproto owns those rows) or "mtproto-c" (the vpn-ui
+// telemt plane this service drives). Everything this package does — config
+// generation, process supervision, metrics scraping, secret reconcile — keys on
+// the inbound's protocol string through this one predicate, so a new plane is
+// one line here.
+func isMtprotoPlane(p model.Protocol) bool {
+	return p == defaults.ProtoMTProto || p == defaults.ProtoMTProtoC
+}
+
 // mtprotoProcName is this inbound's procMgr child name. telemt does not retitle
 // its own process, so the prefix reap in migrateFromSystemd needs no -x entry.
 func mtprotoProcName(inboundId int) string {
@@ -311,11 +322,16 @@ func mtprotoMetricsPort(inbound *model.Inbound) int {
 // operator's per-client routing rule; that traffic takes the default outbound.
 const mtprotoSystemAccount = "telemt-system"
 
-// GetMtprotoInbounds returns every mtproto inbound.
+// GetMtprotoInbounds returns every inbound of EITHER mtproto plane. The telemt
+// service only acts on mtproto-c rows (every query below filters through
+// isMtprotoPlane before touching the daemon); plain mtproto rows ride along so
+// the shared reconcile/count helpers see a complete picture.
 func (s *MtprotoService) GetMtprotoInbounds() ([]*model.Inbound, error) {
 	db := vpn.DB()
 	var inbounds []*model.Inbound
-	err := db.Model(model.Inbound{}).Where("protocol = ?", defaults.ProtoMTProto).Find(&inbounds).Error
+	err := db.Model(model.Inbound{}).
+		Where("protocol IN ?", []model.Protocol{defaults.ProtoMTProto, defaults.ProtoMTProtoC}).
+		Find(&inbounds).Error
 	if err != nil {
 		return nil, err
 	}
@@ -389,6 +405,12 @@ func (s *MtprotoService) tlsDomain(settings *mtprotoSettings) string {
 // an identity assertion between two local processes, not an auth boundary. Anyone
 // who could reach the port already has local root.
 func (s *MtprotoService) GetSocksConfig(inbound *model.Inbound) *xray.InboundConfig {
+	// Only the telemt planes' rows reach this builder; plain mtproto rows are
+	// excluded by the caller's paired-inbound filter (their mtg sidecar has its
+	// own egress bridge in internal/web/service/xray.go).
+	if !isMtprotoPlane(inbound.Protocol) {
+		return nil
+	}
 	settings, err := s.parseSettings(inbound)
 	if err != nil || !s.usingRouting(settings) {
 		return nil
@@ -441,10 +463,22 @@ func (s *MtprotoService) telemtBinaryPath() string {
 	return procmgr.DaemonBin("telemt")
 }
 
-// InitMtproto brings the MTProto stack up at panel start.
+// InitMtproto brings the MTProto stack up at panel start. Only mtproto-c rows
+// are served here (the telemt daemon); plain mtproto rows belong to the 3x-ui
+// mtg sidecar, which internal/mtproto's own manager brings up.
 func (s *MtprotoService) InitMtproto() {
 	inbounds, err := s.GetMtprotoInbounds()
-	if err != nil || len(inbounds) == 0 {
+	if err != nil {
+		return
+	}
+	hasTelemt := false
+	for _, inbound := range inbounds {
+		if inbound.Protocol == defaults.ProtoMTProtoC {
+			hasTelemt = true
+			break
+		}
+	}
+	if !hasTelemt {
 		return
 	}
 	if err := s.GenerateAllConfigs(); err != nil {
@@ -490,6 +524,11 @@ func (s *MtprotoService) LiftClientSettingsToInbound() error {
 	db := vpn.DB()
 
 	for _, inbound := range inbounds {
+		// The legacy-shape lift is only meaningful for the telemt planes'
+		// settings shape; plain mtproto rows (3x-ui mtg sidecar) never carry it.
+		if !isMtprotoPlane(inbound.Protocol) {
+			continue
+		}
 		var raw map[string]json.RawMessage
 		if err := json.Unmarshal([]byte(inbound.Settings), &raw); err != nil || raw == nil {
 			continue
@@ -573,6 +612,11 @@ func (s *MtprotoService) MirrorInboundSettingsToClients() error {
 	db := vpn.DB()
 
 	for _, inbound := range inbounds {
+		// The mirror keeps the OLD binary's per-client shape current; it is only
+		// meaningful for the telemt planes' settings shape.
+		if !isMtprotoPlane(inbound.Protocol) {
+			continue
+		}
 		settings, err := s.parseSettings(inbound)
 		if err != nil {
 			continue
@@ -650,6 +694,11 @@ func (s *MtprotoService) ReconcileSecrets() error {
 	}
 	db := vpn.DB()
 	for _, inbound := range inbounds {
+		// Secrets are the telemt planes' credential; plain mtproto rows (3x-ui
+		// mtg sidecar) have their own secret reconcile in internal/mtproto.
+		if !isMtprotoPlane(inbound.Protocol) {
+			continue
+		}
 		settings, err := s.parseSettings(inbound)
 		if err != nil {
 			continue
@@ -722,6 +771,11 @@ func (s *MtprotoService) GenerateAllConfigs() error {
 	}
 	for _, inbound := range inbounds {
 		if !inbound.Enable {
+			continue
+		}
+		// The telemt daemon serves the mtproto-c plane only; plain mtproto rows
+		// belong to the 3x-ui mtg sidecar (internal/mtproto) and are skipped.
+		if inbound.Protocol != defaults.ProtoMTProtoC {
 			continue
 		}
 		needRestart, err := s.generateServerConfig(inbound)
@@ -1061,6 +1115,11 @@ func (s *MtprotoService) RestartServices() error {
 		if !inbound.Enable {
 			continue
 		}
+		// The telemt daemon serves the mtproto-c plane only; plain mtproto rows
+		// belong to the 3x-ui mtg sidecar (internal/mtproto) and are skipped.
+		if inbound.Protocol != defaults.ProtoMTProtoC {
+			continue
+		}
 		settings, err := s.parseSettings(inbound)
 		if err != nil {
 			vpnlog.Warning("MTProto: skipping inbound", inbound.Id, err)
@@ -1118,6 +1177,11 @@ func (s *MtprotoService) EnsureServicesRunning() error {
 	bin := s.telemtBinaryPath()
 	for _, inbound := range inbounds {
 		if !inbound.Enable {
+			continue
+		}
+		// The telemt daemon serves the mtproto-c plane only; plain mtproto rows
+		// belong to the 3x-ui mtg sidecar (internal/mtproto) and are skipped.
+		if inbound.Protocol != defaults.ProtoMTProtoC {
 			continue
 		}
 		settings, err := s.parseSettings(inbound)
@@ -1193,6 +1257,11 @@ func (s *MtprotoService) CollectTraffic() []*xray.ClientTraffic {
 	var out []*xray.ClientTraffic
 	for _, inbound := range inbounds {
 		if !inbound.Enable {
+			continue
+		}
+		// The telemt metrics endpoint serves the mtproto-c plane only; plain
+		// mtproto rows belong to the 3x-ui mtg sidecar (internal/mtproto job).
+		if inbound.Protocol != defaults.ProtoMTProtoC {
 			continue
 		}
 		settings, err := s.parseSettings(inbound)

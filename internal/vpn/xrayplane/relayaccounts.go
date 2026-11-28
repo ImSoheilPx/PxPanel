@@ -60,7 +60,9 @@ func RelayAccountsFor(protocol string, inbound *model.Inbound) ([]SocksAccount, 
 		return nil, false
 	}
 	switch protocol {
-	case string(defaults.ProtoMTProto):
+	case string(defaults.ProtoMTProto), string(defaults.ProtoMTProtoC):
+		// mtproto-c is the SAME telemt settings shape under its own protocol
+		// string, so one account body serves both planes.
 		return defaultMtprotoAccounts(inbound.Settings)
 	case string(defaults.ProtoSSH):
 		return defaultSshAccounts(inbound.Settings)

@@ -33,9 +33,15 @@ const (
 	ProtoAWG         model.Protocol = "awg"
 	ProtoGRE         model.Protocol = "gre"
 	ProtoMTProto     model.Protocol = "mtproto"
-	ProtoSSH         model.Protocol = "ssh"
-	ProtoAnyTLS      model.Protocol = "anytls"
-	ProtoNaive       model.Protocol = "naive"
+	// ProtoMTProtoC is the vpn-ui telemt MTProto plane (Sir-MmD telemt daemon,
+	// one process per inbound, relay egress through a paired loopback socks).
+	// It is a DISTINCT protocol string from ProtoMTProto because 3x-ui itself
+	// has always owned the plain "mtproto" string with its own settings shape
+	// (the mtg sidecar), and both planes must stay creatable side by side.
+	ProtoMTProtoC model.Protocol = "mtproto-c"
+	ProtoSSH      model.Protocol = "ssh"
+	ProtoAnyTLS   model.Protocol = "anytls"
+	ProtoNaive    model.Protocol = "naive"
 	// ProtoHysteria2 is the literal import string some sources carry for Hysteria v2;
 	// the panel stores both generations as "hysteria", so identity checks accept both.
 	ProtoHysteria2 model.Protocol = "hysteria2"
@@ -397,6 +403,21 @@ func protocolSettingDefaults(protocol model.Protocol) []settingDefault {
 			def("clients", noClients()),
 			// The inbound-wide link endpoints, overridden per account by the client's
 			// own externalProxy.
+			def("externalProxy", emptyList()),
+		}
+
+	case ProtoMTProtoC:
+		// The vpn-ui telemt plane under its own protocol string. Same settings
+		// shape and defaults as the telemt case above — the ONLY difference
+		// between the two planes is the protocol string the row carries (and
+		// therefore which service wave claims it), never the payload.
+		return []settingDefault{
+			def("modeClassic", true),
+			def("modeSecure", true),
+			def("modeTls", true),
+			def("tlsDomain", "www.google.com"),
+			def("userLimit", 10),
+			def("clients", noClients()),
 			def("externalProxy", emptyList()),
 		}
 

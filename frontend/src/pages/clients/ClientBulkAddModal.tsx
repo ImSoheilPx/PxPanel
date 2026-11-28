@@ -37,6 +37,11 @@ const MULTI_CLIENT_PROTOCOLS = new Set([
   'trojan',
   'hysteria',
   'wireguard',
+  // The vpn-ui relay protocols (multi-client settings.clients[], mirrored by
+  // the accounts layer). mtproto-c is the vpn-ui telemt plane; plain mtproto
+  // stays the 3x-ui mtg sidecar, which the bulk form never addressed.
+  'ssh',
+  'mtproto-c',
   'amneziawg',
   'tuic',
   'masque',

@@ -338,8 +338,9 @@ export const PoolBlockSchema = loose.extend({
 });
 export type PoolBlock = z.infer<typeof PoolBlockSchema>;
 
-// The VPN protocol family this panel's vpn surface serves. mtproto is
-// deliberately absent: this panel's mtproto plane is the v3 sidecar.
+// The VPN protocol family this panel's vpn surface serves. The plain mtproto
+// key is deliberately absent: this panel's legacy mtproto plane is the v3 mtg
+// sidecar, while the vpn-ui telemt stack is exposed as mtproto-c.
 export const VPN_PROTOCOLS = [
   'l2tp',
   'pptp',
@@ -351,6 +352,7 @@ export const VPN_PROTOCOLS = [
   'awg',
   'gre',
   'ssh',
+  'mtproto-c',
 ] as const;
 
 export type VpnProtocol = (typeof VPN_PROTOCOLS)[number];

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.21
+
+- MTProto-C is now a first-class protocol: it appears in the inbound protocol picker (with its own transport fields — Classic / Secure (dd) / FakeTLS (ee), camouflage domain and per-inbound user limit), in client multi-inbound selection, in the VPN row badge/actions and in the settings toast plumbing. The legacy v3 mtg sidecar plane keeps its separate `mtproto` core row; both share one telemt daemon.
+- Client → Attached inbounds now lists SSH Gateway and MTProto-C inbounds like every other protocol (multi-select whitelist extended).
+- Core stop is now real and stays stopped: a manual stop latches the core so inbound/client saves, the traffic tick's data-plane reconcile (WireGuard-C / AmneziaWG / GRE re-plumb) and the Xray restart scheduler cannot silently undo it. A green Start button appears for stopped cores; explicit Restart / Restart-all clears the latch.
+- Stop/Start are logged ("core X: stop requested by operator" / "core X: stopped") so the core's own log shows the action; the SSH gateway log now also shows manual holds and listener rebinding.
+- Core Settings logs open in the panel's standard log viewer: line-count and level filters, auto-update, download, parsed timestamp/level/service rendering (same look as the panel Logs page) instead of a raw text dump.
+- Version bumped to 1.0.21.
+
 ## 1.0.2
 
 - Inbound form unification: VPN protocols are now configured inside the standard Add/Modify Inbound dialog (same tabs and Basics fields, per-field tooltips); the separate VPN dialog was removed and the protocol picker no longer shows a group-sentinel item.

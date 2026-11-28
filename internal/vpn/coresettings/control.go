@@ -5,9 +5,11 @@
 package coresettings
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/ImSoheilPx/pxpanel/internal/logger"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/ipsec"
@@ -17,8 +19,96 @@ import (
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/xrayplane"
 )
 
-// RestartCore restarts the daemon(s) for a given core.
+// The manual-stop latch. Stopping a core from Core Settings is an OPERATOR
+// decision, not a transient daemon failure — but every reconcile path in the
+// panel (inbound/client save hooks, the traffic job's per-tick data-plane
+// reconcile for the kernel protocols, the Xray restart scheduler) rebuilds its
+// core's running state from the DB and would silently undo the stop within
+// seconds. The latch records "the operator stopped this core on purpose" so
+// those paths skip their restart/reconcile until the operator explicitly
+// restarts (Start) or restarts all.
+//
+// The latch is in-memory on purpose: a panel restart re-runs the boot Init*
+// sequence, which brings every installed core back up — the same behavior the
+// source project has, and a stopped daemon that survives a panel upgrade would
+// look like a broken install.
+var (
+	manualStopMu   sync.Mutex
+	manualStopped  = map[string]bool{}
+	manualStopNote = map[string]string{} // core -> what the operator last did
+)
+
+// latchCoreKey normalizes the two mtproto planes onto their single shared
+// daemon: stopping or starting either core stops/starts the same telemt
+// children, so they share one latch.
+func latchCoreKey(name string) string {
+	if name == "mtproto-c" {
+		return "mtproto"
+	}
+	return name
+}
+
+// latchManualStop records an operator stop.
+func latchManualStop(name string) {
+	manualStopMu.Lock()
+	defer manualStopMu.Unlock()
+	manualStopped[latchCoreKey(name)] = true
+	manualStopNote[latchCoreKey(name)] = name
+}
+
+// clearManualStop clears the latch after an explicit restart. Restarting either
+// mtproto plane restarts the shared daemon, so both clear together.
+func clearManualStop(name string) {
+	manualStopMu.Lock()
+	defer manualStopMu.Unlock()
+	key := latchCoreKey(name)
+	delete(manualStopped, key)
+	delete(manualStopNote, key)
+	if key == "mtproto" {
+		delete(manualStopNote, "mtproto-c")
+	}
+}
+
+// CoreManuallyStopped reports whether the operator stopped this core from Core
+// Settings and has not restarted it since. Automatic reconcile paths (hooks,
+// traffic job, Xray restart scheduler) consult this before touching the core's
+// running state; an explicit RestartCore always clears it.
+func CoreManuallyStopped(name string) bool {
+	manualStopMu.Lock()
+	defer manualStopMu.Unlock()
+	return manualStopped[latchCoreKey(name)]
+}
+
+// CoreManuallyStoppedAs reports the core name the operator actually stopped
+// (mtproto vs mtproto-c share one daemon, so the row that was clicked wins),
+// for log lines.
+func CoreManuallyStoppedAs(name string) string {
+	manualStopMu.Lock()
+	defer manualStopMu.Unlock()
+	key := latchCoreKey(name)
+	if manualStopped[key] {
+		if as, ok := manualStopNote[key]; ok {
+			return as
+		}
+	}
+	return name
+}
+
+// RestartCore restarts the daemon(s) for a given core. An explicit restart is
+// also the operator's "Start" after a manual stop, so the latch clears here.
 func (s *CoreService) RestartCore(name string) error {
+	logger.Info("core", name, ": restart requested by operator")
+	err := s.restartCore(name)
+	if err != nil {
+		logger.Warning("core", name, ": restart failed:", err)
+		return err
+	}
+	clearManualStop(name)
+	logger.Info("core", name, ": restarted")
+	return nil
+}
+
+func (s *CoreService) restartCore(name string) error {
 	switch name {
 	case "xray":
 		// The web layer's RestartXray(force) — unwired this is a logged no-op.
@@ -43,6 +133,10 @@ func (s *CoreService) RestartCore(name string) error {
 		return s.gre.RestartServices()
 	case "mtproto":
 		return s.mtproto.RestartServices()
+	case "mtproto-c":
+		// Both mtproto planes share one daemon and one supervision prefix;
+		// RestartServices reconciles only mtproto-c inbounds against it.
+		return s.mtproto.RestartServices()
 	case "ssh":
 		return s.ssh.RestartServices()
 	case "radius":
@@ -59,7 +153,7 @@ func (s *CoreService) RestartCore(name string) error {
 // one failing core doesn't abort the rest.
 func (s *CoreService) RestartAll() error {
 	var errs []string
-	for _, name := range []string{"xray", "l2tp", "pptp", "openvpn", "openconnect", "sstp", "ikev2", "wgc", "awg", "gre", "mtproto", "ssh", "radius"} {
+	for _, name := range []string{"xray", "l2tp", "pptp", "openvpn", "openconnect", "sstp", "ikev2", "wgc", "awg", "gre", "mtproto", "mtproto-c", "ssh", "radius"} {
 		if err := s.RestartCore(name); err != nil {
 			errs = append(errs, fmt.Sprintf("%s: %v", name, err))
 		}
@@ -70,8 +164,22 @@ func (s *CoreService) RestartAll() error {
 	return nil
 }
 
-// StopCore stops a core, where stopping is supported.
+// StopCore stops a core, where stopping is supported. The stop is latched so
+// automatic reconciles cannot silently undo it (see CoreManuallyStopped); a
+// later RestartCore — the UI's Start button — clears it.
 func (s *CoreService) StopCore(name string) error {
+	logger.Info("core", name, ": stop requested by operator")
+	latchManualStop(name)
+	err := s.stopCore(name)
+	if err != nil {
+		logger.Warning("core", name, ": stop failed:", err)
+		return err
+	}
+	logger.Info("core", name, ": stopped (stays stopped until explicitly restarted)")
+	return nil
+}
+
+func (s *CoreService) stopCore(name string) error {
 	switch name {
 	case "xray":
 		if XrayStop == nil {
@@ -101,6 +209,10 @@ func (s *CoreService) StopCore(name string) error {
 	case "gre":
 		return s.gre.StopServices()
 	case "mtproto":
+		return s.mtproto.StopServices()
+	case "mtproto-c":
+		// One daemon, one prefix: stopping either mtproto plane's core stops
+		// the same telemt children. (StopServices is idempotent.)
 		return s.mtproto.StopServices()
 	case "ssh":
 		return s.ssh.StopServices()
@@ -163,6 +275,9 @@ func (s *CoreService) CoreLogs(name string) string {
 		return fmt.Sprintf("GRE runs in-kernel via netlink (no daemon log).\nTunnel(s) up: %s\nFOU (UDP encap) available: %s", up, fou)
 	case "mtproto":
 		return procmgr.GetProcManager().LogsByPrefix(mtprotoProcPrefix)
+	case "mtproto-c":
+		// One daemon, one prefix: the telemt log serves both mtproto planes.
+		return procmgr.GetProcManager().LogsByPrefix(mtprotoProcPrefix)
 	case "ssh":
 		running := "no"
 		if s.ssh.AnyRunning() {
@@ -208,9 +323,9 @@ func ipsecFailureDiagnostics() string {
 		return ""
 	}
 	var b strings.Builder
-	out, _ := exec.Command("systemctl", "status", "ipsec", "--no-pager", "-l").CombinedOutput()
+	out, _ := exec.CommandContext(context.Background(), "systemctl", "status", "ipsec", "--no-pager", "-l").CombinedOutput()
 	b.WriteString("\n$ systemctl status ipsec\n" + string(out))
-	if jout, _ := exec.Command("journalctl", "-u", "ipsec", "--no-pager", "-n", "30").CombinedOutput(); len(jout) > 0 {
+	if jout, _ := exec.CommandContext(context.Background(), "journalctl", "-u", "ipsec", "--no-pager", "-n", "30").CombinedOutput(); len(jout) > 0 {
 		b.WriteString("\n$ journalctl -u ipsec -n 30\n" + string(jout))
 	}
 	return b.String()

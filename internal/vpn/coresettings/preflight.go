@@ -12,6 +12,7 @@
 package coresettings
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,8 +62,10 @@ func preflightFile(path string) *CoreHostConflict {
 	if _, err := os.Lstat(path); err != nil {
 		return nil
 	}
-	return &CoreHostConflict{Kind: kindFile, What: path,
-		Detail: "already present; pxpanel will replace it and keep a copy in " + ownershipBackupDir}
+	return &CoreHostConflict{
+		Kind: kindFile, What: path,
+		Detail: "already present; pxpanel will replace it and keep a copy in " + ownershipBackupDir,
+	}
 }
 
 // preflightDir reports a config directory the core will write into.
@@ -71,14 +74,16 @@ func preflightDir(path string) *CoreHostConflict {
 	if err != nil || !st.IsDir() {
 		return nil
 	}
-	return &CoreHostConflict{Kind: kindDir, What: path,
-		Detail: "already exists; pxpanel will add its own files inside it and never remove the directory"}
+	return &CoreHostConflict{
+		Kind: kindDir, What: path,
+		Detail: "already exists; pxpanel will add its own files inside it and never remove the directory",
+	}
 }
 
 // unitEnabled / unitActive are mirrors of procmgr's unexported probes of the
 // same names (vpn-ui kept them in web/service/procmgr.go).
 func unitEnabled(unit string) bool {
-	out, err := exec.Command("systemctl", "is-enabled", unit).Output()
+	out, err := exec.CommandContext(context.Background(), "systemctl", "is-enabled", unit).Output()
 	return err == nil && strings.TrimSpace(string(out)) == "enabled"
 }
 
@@ -102,8 +107,10 @@ func preflightUnit(unit string) *CoreHostConflict {
 	} else if active {
 		state = "running"
 	}
-	return &CoreHostConflict{Kind: kindUnit, What: unit,
-		Detail: state + "; pxpanel will stop and disable it so the panel can run this daemon, and re-enable it on uninstall"}
+	return &CoreHostConflict{
+		Kind: kindUnit, What: unit,
+		Detail: state + "; pxpanel will stop and disable it so the panel can run this daemon, and re-enable it on uninstall",
+	}
 }
 
 // preflightIfaces reports the operator's own netdevs that share a protocol's
@@ -132,8 +139,10 @@ func preflightIfaces(core string) []CoreHostConflict {
 		if !match {
 			continue
 		}
-		out = append(out, CoreHostConflict{Kind: kindIface, What: name,
-			Detail: "your own interface; pxpanel will not touch it"})
+		out = append(out, CoreHostConflict{
+			Kind: kindIface, What: name,
+			Detail: "your own interface; pxpanel will not touch it",
+		})
 	}
 	return out
 }
@@ -174,8 +183,10 @@ func hostConflictsFor(core string) []CoreHostConflict {
 		// openvpn-server@<name> is templated, so the instances are found rather
 		// than named. An enabled instance is the operator's own server.
 		if matches, _ := filepath.Glob("/etc/openvpn/server/*.conf"); len(matches) > 0 {
-			out = append(out, CoreHostConflict{Kind: kindFile, What: "/etc/openvpn/server/*.conf",
-				Detail: "the distro's own OpenVPN server configs; pxpanel neither reads nor removes them"})
+			out = append(out, CoreHostConflict{
+				Kind: kindFile, What: "/etc/openvpn/server/*.conf",
+				Detail: "the distro's own OpenVPN server configs; pxpanel neither reads nor removes them",
+			})
 		}
 	case "openconnect":
 		add(preflightDir("/etc/ocserv"))

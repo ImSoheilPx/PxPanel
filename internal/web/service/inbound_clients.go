@@ -14,6 +14,7 @@ import (
 	"github.com/ImSoheilPx/pxpanel/internal/database/model"
 	"github.com/ImSoheilPx/pxpanel/internal/logger"
 	"github.com/ImSoheilPx/pxpanel/internal/util/common"
+	"github.com/ImSoheilPx/pxpanel/internal/vpn/defaults"
 	"github.com/ImSoheilPx/pxpanel/internal/xray"
 
 	"gorm.io/gorm"
@@ -246,7 +247,7 @@ func (s *InboundService) buildTargetClientFromSource(source model.Client, target
 		target.Password = s.generateRandomCredential(targetProtocol)
 	case model.Hysteria:
 		target.Auth = s.generateRandomCredential(targetProtocol)
-	case model.MTProto:
+	case model.MTProto, defaults.ProtoMTProtoC:
 		target.Secret = model.GenerateFakeTLSSecret(mtprotoDomainFromSettings(targetInbound.Settings))
 	case model.TUIC:
 		target.ID = uuid.NewString()

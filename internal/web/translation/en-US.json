@@ -147,7 +147,8 @@
         "wg-c": "WireGuard",
         "awg": "AmneziaWG",
         "gre": "GRE",
-        "ssh": "SSH"
+        "ssh": "SSH",
+        "mtproto-c": "MTProto-C"
       },
       "deleteConfirm": "Delete inbound “{name}”?",
       "accounts": "Accounts",
@@ -248,7 +249,15 @@
         "fouEnable": "FoU on",
         "fouEnableHint": "Wrap GRE in Foo-over-UDP so intermediate NATs accept the tunnel.",
         "fouPort": "FoU port",
-        "fouPortHint": "UDP port used for the FoU encapsulation. Clients must target this port."
+        "fouPortHint": "UDP port used for the FoU encapsulation. Clients must target this port.",
+        "modeClassic": "Classic transport",
+        "modeClassicHint": "Accept unobfuscated MTProto transports (abridged / intermediate).",
+        "modeSecure": "Secure (dd) transport",
+        "modeSecureHint": "Accept the obfuscated \"dd\" transport (random padding).",
+        "modeTls": "FakeTLS (ee) transport",
+        "modeTlsHint": "Accept the FakeTLS transport: real TLS records wrapping MTProto, hardest to detect.",
+        "tlsDomain": "FakeTLS domain",
+        "tlsDomainHint": "Domain presented in the FakeTLS ServerHello camouflage. Clients may override it per account."
       },
       "toasts": {
         "deleted": "Inbound deleted",
@@ -502,7 +511,9 @@
       "iprouteHint": "iproute2 (ip/tc) — required to create tunnel interfaces and shape traffic.",
       "modulesHint": "Kernel modules the cores need. Red tags are required but missing; grey are optional.",
       "uninstallInboundsModeHint": "Delete removes the inbounds and their accounts; keep leaves them but they cannot connect until a matching core is installed.",
-      "configTargetHint": "Config file to edit: per-inbound entries override what the core generated for that inbound."
+      "configTargetHint": "Config file to edit: per-inbound entries override what the core generated for that inbound.",
+      "start": "Start",
+      "startHint": "Start this core after a manual stop."
     },
     "login": {
       "hello": "Hello",

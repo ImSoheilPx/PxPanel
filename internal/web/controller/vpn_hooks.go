@@ -12,6 +12,7 @@ package controller
 import (
 	"github.com/ImSoheilPx/pxpanel/internal/logger"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/awg"
+	"github.com/ImSoheilPx/pxpanel/internal/vpn/coresettings"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/gre"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/ikev2"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/l2tp"
@@ -43,11 +44,30 @@ type vpnHooks struct {
 	ssh     ssh.SshService
 }
 
+// operatorHold logs once per call site when a manually-stopped core skips its
+// automatic reconcile (see coresettings.CoreManuallyStopped). Info level: an
+// operator who stopped a core and then saved a client should SEE why nothing
+// came back up, in the core's own log.
+func operatorHold(core string) bool {
+	if !coresettings.CoreManuallyStopped(core) {
+		return false
+	}
+	logger.Info("core", coresettings.CoreManuallyStoppedAs(core),
+		": is manually stopped; skipping automatic reconcile until it is started again")
+	return true
+}
+
 // needRestart asks the web layer's restart scheduler to rebuild + restart the core.
 // The seam is filled at server start-up (vpnWireRequestRestart), but a nil hook
 // degrades to the direct SetToNeedRestart on the XrayService the controllers
 // already hold, so tests without a running server still work.
+//
+// Skipped while the operator has Xray manually stopped: a stopped core stays
+// stopped, so protocol saves must not resurrect it via the restart scheduler.
 func (h *vpnHooks) needRestart() {
+	if operatorHold("xray") {
+		return
+	}
 	if vpnRequestRestartHook != nil {
 		vpnRequestRestartHook()
 		return
@@ -75,7 +95,9 @@ func (h *vpnHooks) l2tpChanged(clientOnly bool) {
 	// data lives in the xl2tpd config, so a restart would only drop connected
 	// tunnels. Restart for inbound-level changes, or when the pool auto-expanded.
 	if !clientOnly || expanded {
-		if err := h.l2tp.RestartServices(); err != nil {
+		if operatorHold("l2tp") {
+			// core manually stopped: keep configs fresh, do not restart it
+		} else if err := h.l2tp.RestartServices(); err != nil {
 			logger.Warning("L2TP: service restart failed:", err)
 		}
 		// Drop cached per-device IP assignments so a changed User Limit / range /
@@ -103,7 +125,9 @@ func (h *vpnHooks) pptpChanged(clientOnly bool) {
 	// Client-only changes don't restart pptpd (auth is live via RADIUS) — see
 	// l2tpChanged. Restart for inbound-level changes or a pool expansion.
 	if !clientOnly || expanded {
-		if err := h.pptp.RestartServices(); err != nil {
+		if operatorHold("pptp") {
+			// core manually stopped: keep configs fresh, do not restart it
+		} else if err := h.pptp.RestartServices(); err != nil {
 			logger.Warning("PPTP: service restart failed:", err)
 		}
 		radius.ResetAllocations("pptp")
@@ -132,7 +156,9 @@ func (h *vpnHooks) openVpnChanged(clientOnly bool) {
 	// restart; the running server reads it on the client's next connect. Restart only
 	// for inbound-level changes or a pool expansion.
 	if !clientOnly || expanded {
-		if err := h.openvpn.RestartServices(); err != nil {
+		if operatorHold("openvpn") {
+			// core manually stopped: keep configs fresh, do not restart it
+		} else if err := h.openvpn.RestartServices(); err != nil {
 			logger.Warning("OpenVPN: service restart failed:", err)
 		}
 	}
@@ -157,7 +183,9 @@ func (h *vpnHooks) ocservChanged(clientOnly bool) {
 	// Client-only changes don't restart ocserv (auth is live via RADIUS) — see
 	// l2tpChanged. Restart for inbound-level changes or a pool expansion.
 	if !clientOnly || expanded {
-		if err := h.ocserv.RestartServices(); err != nil {
+		if operatorHold("openconnect") {
+			// core manually stopped: keep configs fresh, do not restart it
+		} else if err := h.ocserv.RestartServices(); err != nil {
 			logger.Warning("OpenConnect: service restart failed:", err)
 		}
 		radius.ResetAllocations("openconnect")
@@ -182,7 +210,9 @@ func (h *vpnHooks) sstpChanged(clientOnly bool) {
 	// Client-only changes don't restart accel-ppp (auth is live via RADIUS) — see
 	// l2tpChanged. Restart for inbound-level changes or a pool expansion.
 	if !clientOnly || expanded {
-		if err := h.sstp.RestartServices(); err != nil {
+		if operatorHold("sstp") {
+			// core manually stopped: keep configs fresh, do not restart it
+		} else if err := h.sstp.RestartServices(); err != nil {
 			logger.Warning("SSTP: service restart failed:", err)
 		}
 		radius.ResetAllocations("sstp")
@@ -206,7 +236,9 @@ func (h *vpnHooks) ikev2Changed(clientOnly bool) {
 	}
 	// charon hot-reloads via swanctl --load-all (no tunnel drop) and a new client's
 	// conn/pool must be (re)loaded, so always reload — this never disconnects anyone.
-	if err := h.ikev2.RestartServices(); err != nil {
+	if operatorHold("ikev2") {
+		// core manually stopped: swanctl reload skipped with it
+	} else if err := h.ikev2.RestartServices(); err != nil {
 		logger.Warning("IKEv2: service restart failed:", err)
 	}
 	// Only drop the IP-allocation cache for inbound-level changes or a pool expansion.
@@ -227,9 +259,13 @@ func (h *vpnHooks) mtprotoChanged(clientOnly bool) {
 		logger.Warning("MTProto: config generation failed:", err)
 	}
 	if !clientOnly {
-		if err := h.mtproto.RestartServices(); err != nil {
+		if operatorHold("mtproto") {
+			// shared daemon manually stopped: regenerate configs only
+		} else if err := h.mtproto.RestartServices(); err != nil {
 			logger.Warning("MTProto: service restart failed:", err)
 		}
+	} else if operatorHold("mtproto") {
+		// shared daemon manually stopped: do not ensure-start it
 	} else {
 		// Client-only changes hot-reload a running telemt via its config watcher, but
 		// when this change produces the inbound's first usable account nothing has
@@ -254,7 +290,9 @@ func (h *vpnHooks) sshChanged(clientOnly bool) {
 		logger.Warning("SSH: host key reconcile failed:", err)
 	}
 	if !clientOnly {
-		if err := h.ssh.RestartServices(); err != nil {
+		if operatorHold("ssh") {
+			// core manually stopped: do not re-bind its listeners
+		} else if err := h.ssh.RestartServices(); err != nil {
 			logger.Warning("SSH: service restart failed:", err)
 		}
 	}
@@ -274,7 +312,10 @@ func (h *vpnHooks) wgcChanged(clientOnly bool) {
 	// Mint any missing server/device keypairs (sized to each account's User Limit K)
 	// and persist them, so GenerateAllConfigs can materialize the peers.
 	h.wgc.ReconcileAllKeys()
-	if err := h.wgc.GenerateAllConfigs(); err != nil {
+	if operatorHold("wgc") {
+		// core manually stopped: skip the data-plane reconcile entirely, the
+		// traffic tick would otherwise re-plumb the kernel state within seconds
+	} else if err := h.wgc.GenerateAllConfigs(); err != nil {
 		logger.Warning("WireGuard: config generation failed:", err)
 	}
 	if err := h.wgc.SetupRouting(); err != nil {
@@ -290,7 +331,10 @@ func (h *vpnHooks) onAwgClientChanged() { h.awgChanged(true) }
 func (h *vpnHooks) awgChanged(clientOnly bool) {
 	expanded := vpnrange.AutoExpandVpnRanges("awg")
 	h.awg.ReconcileAllKeys()
-	if err := h.awg.GenerateAllConfigs(); err != nil {
+	if operatorHold("awg") {
+		// core manually stopped: skip the data-plane reconcile entirely, the
+		// traffic tick would otherwise re-plumb the kernel state within seconds
+	} else if err := h.awg.GenerateAllConfigs(); err != nil {
 		logger.Warning("AmneziaWG: config generation failed:", err)
 	}
 	if err := h.awg.SetupRouting(); err != nil {
@@ -306,7 +350,10 @@ func (h *vpnHooks) onGreClientChanged() { h.greChanged(true) }
 func (h *vpnHooks) greChanged(clientOnly bool) {
 	expanded := vpnrange.AutoExpandVpnRanges("gre")
 	h.gre.ReconcileAllPeers()
-	if err := h.gre.GenerateAllConfigs(); err != nil {
+	if operatorHold("gre") {
+		// core manually stopped: skip the data-plane reconcile entirely, the
+		// traffic tick would otherwise re-plumb the kernel state within seconds
+	} else if err := h.gre.GenerateAllConfigs(); err != nil {
 		logger.Warning("GRE: config generation failed:", err)
 	}
 	if err := h.gre.SetupRouting(); err != nil {
@@ -367,7 +414,7 @@ func (h *vpnHooks) reconcileForInbounds(inboundIds []int, needRestart bool) {
 			h.onAwgClientChanged()
 		case protoGRE:
 			h.onGreClientChanged()
-		case protoMTPROTO:
+		case protoMTPROTO, protoMTPROTOC:
 			h.onMtprotoClientChanged()
 		case protoSSH:
 			h.onSshClientChanged()
@@ -417,7 +464,7 @@ func (h *vpnHooks) reconcileInboundLevel(protocols map[xrayProtocol]bool) {
 			h.onAwgChanged()
 		case protoGRE:
 			h.onGreChanged()
-		case protoMTPROTO:
+		case protoMTPROTO, protoMTPROTOC:
 			h.onMtprotoChanged()
 		case protoSSH:
 			h.onSshChanged()

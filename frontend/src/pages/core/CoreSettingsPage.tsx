@@ -8,6 +8,7 @@ import {
   Col,
   ConfigProvider,
   Descriptions,
+  Form,
   Layout,
   Modal,
   Result,
@@ -29,8 +30,10 @@ import {
   DownloadOutlined,
   FileTextOutlined,
   PauseCircleOutlined,
+  PlayCircleOutlined,
   ReloadOutlined,
   SettingOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 
 import { useTheme } from '@/hooks/useTheme';
@@ -46,6 +49,10 @@ import {
   useVpnProvisionStatus,
   useVpnUninstallStatus,
 } from '@/api/queries/useVpnCore';
+import { FileManager } from '@/utils';
+import { activateOnKey } from '@/utils/a11y';
+import { LEVELS, parseLogLine } from '../index/logParse';
+import '../index/LogModal.css';
 import CoreConfigModal from './CoreConfigModal';
 import './CoreSettingsPage.css';
 
@@ -351,6 +358,18 @@ export default function CoreSettingsPage() {
           }
           return (
             <Space size={0}>
+              {(row.state === 'stopped' || row.state === 'error') && (
+                <Tooltip title={t('pages.core.startHint')}>
+                  <Button
+                    type="text"
+                    size="small"
+                    style={{ fontSize: 16 }}
+                    icon={<PlayCircleOutlined aria-hidden />}
+                    aria-label={t('pages.core.start')}
+                    onClick={() => onRestart(row.name)}
+                  />
+                </Tooltip>
+              )}
               <Tooltip title={t('pages.core.restartHint')}>
                 <Button
                   type="text"
@@ -655,25 +674,161 @@ export default function CoreSettingsPage() {
 
 function LogsModal({ core, onClose }: { core: string | null; onClose: () => void }) {
   const { t } = useTranslation();
-  const logs = useVpnCoreLogs(core);
+  const { isMobile } = useMediaQuery();
+  const [rows, setRows] = useState('20');
+  const [level, setLevel] = useState('debug');
+  const [autoUpdate, setAutoUpdate] = useState(false);
+  const logs = useVpnCoreLogs(core, autoUpdate ? 5000 : 0);
+
+  const allLines = useMemo(() => (logs.data ? logs.data.split('\n') : []), [logs.data]);
+  // Trim to the last N lines, then parse with the same renderer the panel log
+  // viewer uses, so a core's log looks exactly like the panel's own log page.
+  const parsedLogs = useMemo(() => {
+    const trimmed = allLines.slice(-parseInt(rows, 10));
+    return trimmed.map(parseLogLine);
+  }, [allLines, rows]);
+
+  // Client-side level filter, mirroring the panel log endpoint's semantics:
+  // show the selected level and everything above it; entries without a
+  // recognizable level (raw daemon output) always stay visible.
+  const selectedLevelIdx =
+    level === 'err' ? LEVELS.indexOf('ERROR') : LEVELS.indexOf(level.toUpperCase());
+  const visibleLogs = useMemo(
+    () =>
+      parsedLogs.filter((log) => {
+        if (selectedLevelIdx < 0) return true;
+        if (!log.levelText) return true;
+        const lineIdx = LEVELS.indexOf(log.levelText.toUpperCase());
+        return lineIdx < 0 || lineIdx >= selectedLevelIdx;
+      }),
+    [parsedLogs, selectedLevelIdx],
+  );
+
+  function download() {
+    FileManager.downloadTextFile((logs.data || '').replace(/\n+$/, ''), 'pxpanel.log');
+  }
+
+  const refresh = useCallback(() => void logs.refetch(), [logs]);
+  const titleNode = (
+    <>
+      {t('pages.core.logsTitle', { core: core || '' })}
+      <SyncOutlined
+        spin={logs.isFetching}
+        className="reload-icon"
+        role="button"
+        tabIndex={0}
+        aria-label={t('refresh')}
+        onClick={refresh}
+        onKeyDown={activateOnKey(refresh)}
+      />
+    </>
+  );
+
   return (
     <Modal
       open={core !== null}
       onCancel={onClose}
-      footer={[
-        <Button key="refresh" onClick={() => void logs.refetch()}>
-          {t('refresh')}
-        </Button>,
-        <Button key="close" type="primary" onClick={onClose}>
-          {t('close')}
-        </Button>,
-      ]}
-      title={t('pages.core.logsTitle', { core: core || '' })}
-      width={860}
+      footer={null}
+      width={isMobile ? '100vw' : 860}
+      style={isMobile ? { top: 0, paddingBottom: 0, maxWidth: '100vw' } : undefined}
+      className={isMobile ? 'logmodal-mobile' : undefined}
+      title={titleNode}
     >
-      <pre style={{ maxHeight: 420, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-        {logs.data || t('noData')}
-      </pre>
+      <Form layout="inline" className="log-toolbar">
+        <Form.Item>
+          <Space.Compact>
+            <Select
+              aria-label={t('pages.index.logLines')}
+              value={rows}
+              size="small"
+              style={{ width: 100 }}
+              onChange={setRows}
+              options={[
+                { value: '20', label: '20' },
+                { value: '50', label: '50' },
+                { value: '100', label: '100' },
+                { value: '500', label: '500' },
+                { value: '1000', label: '1000' },
+              ]}
+            />
+            <Select
+              aria-label={t('pages.xray.logLevel')}
+              value={level}
+              size="small"
+              style={{ minWidth: 95 }}
+              onChange={setLevel}
+              options={[
+                { value: 'debug', label: t('pages.index.logLevelDebug') },
+                { value: 'info', label: t('pages.index.logLevelInfo') },
+                { value: 'notice', label: t('pages.index.logLevelNotice') },
+                { value: 'warning', label: t('pages.index.logLevelWarning') },
+                { value: 'err', label: t('pages.index.logLevelError') },
+              ]}
+            />
+          </Space.Compact>
+        </Form.Item>
+        <Form.Item>
+          <Checkbox checked={autoUpdate} onChange={(e) => setAutoUpdate(e.target.checked)}>
+            {t('pages.index.autoUpdate')}
+          </Checkbox>
+        </Form.Item>
+        <Form.Item className="download-item">
+          <Button
+            type="primary"
+            onClick={download}
+            icon={<DownloadOutlined aria-hidden />}
+            aria-label={t('download')}
+          />
+        </Form.Item>
+      </Form>
+
+      <div className={`log-container ${isMobile ? 'log-container-mobile' : ''}`}>
+        {visibleLogs.length === 0 ? (
+          <div className="log-empty">{t('noData')}</div>
+        ) : isMobile ? (
+          visibleLogs.map((log, idx) => (
+            <div key={idx} className="log-card">
+              <div className="log-card-head">
+                {log.stamp && (
+                  <span className="log-time">
+                    {log.time && <span>{log.time}</span>}
+                    {log.time && log.date ? ' ' : ''}
+                    {log.date && <span className="log-date">{log.date}</span>}
+                  </span>
+                )}
+                {log.levelText && (
+                  <span className={`log-level-badge ${log.levelClass}`}>{log.levelText}</span>
+                )}
+              </div>
+              {(log.body || log.service) && (
+                <div className="log-body">
+                  {log.service && <b>{log.service}</b>}
+                  {log.service && log.body ? ' ' : ''}
+                  {log.body && <span className="log-body-text">{log.body}</span>}
+                </div>
+              )}
+            </div>
+          ))
+        ) : (
+          visibleLogs.map((log, idx) => (
+            <div key={idx} className="log-line">
+              {log.stamp && <span className="log-stamp">{log.stamp}</span>}
+              {log.stamp && log.levelText ? ' ' : ''}
+              {log.levelText && (
+                <span className={`log-level ${log.levelClass}`}>{log.levelText}</span>
+              )}
+              {(log.body || log.service) && (
+                <>
+                  {(log.stamp || log.levelText) && <span> - </span>}
+                  {log.service && <b>{log.service}</b>}
+                  {log.service && log.body ? ' ' : ''}
+                  <span>{log.body}</span>
+                </>
+              )}
+            </div>
+          ))
+        )}
+      </div>
     </Modal>
   );
 }

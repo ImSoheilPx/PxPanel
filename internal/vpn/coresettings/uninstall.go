@@ -19,6 +19,7 @@
 package coresettings
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -296,8 +297,10 @@ func (s *CoreService) runCoreUninstall(selected []string, emit func(ProvisionSte
 	//    core's connections instead.
 	for _, n := range selected {
 		if keeper := sharedDaemonKeeper(n, remaining); keeper != "" {
-			emit(ProvisionStep{Name: "stop " + coreDisplayName(n), OK: true,
-				Msg: "left running: the same daemon still serves " + coreDisplayName(keeper)})
+			emit(ProvisionStep{
+				Name: "stop " + coreDisplayName(n), OK: true,
+				Msg: "left running: the same daemon still serves " + coreDisplayName(keeper),
+			})
 			continue
 		}
 		if err := s.StopCore(n); err != nil {
@@ -356,8 +359,10 @@ func (s *CoreService) runCoreUninstall(selected []string, emit func(ProvisionSte
 		// Keeping them would re-apply an edit written against THIS install's inbound
 		// ids to whatever inbound reuses an id after a reinstall, silently.
 		coreconfig.ClearCoreConfigOverrides(n)
-		emit(ProvisionStep{Name: "remove " + coreDisplayName(n) + " config", OK: true,
-			Msg: pathsMsg(removed)})
+		emit(ProvisionStep{
+			Name: "remove " + coreDisplayName(n) + " config", OK: true,
+			Msg: pathsMsg(removed),
+		})
 	}
 
 	// 2b. The host files the removed cores OVERWROTE rather than created.
@@ -413,8 +418,10 @@ func (s *CoreService) runCoreUninstall(selected []string, emit func(ProvisionSte
 		}
 	}
 	if len(dropBins) > 0 {
-		emit(ProvisionStep{Name: "remove bundled binaries", OK: true, Warn: true,
-			Msg: "bundle layer has no removal seam yet (bundle/build wave); " + pathsMsg(dropBins)})
+		emit(ProvisionStep{
+			Name: "remove bundled binaries", OK: true, Warn: true,
+			Msg: "bundle layer has no removal seam yet (bundle/build wave); " + pathsMsg(dropBins),
+		})
 	}
 
 	// 4. Shared features. Each is undone only when NO surviving core claims it.
@@ -426,8 +433,10 @@ func (s *CoreService) runCoreUninstall(selected []string, emit func(ProvisionSte
 		if needsFeature(remaining, feat) {
 			kept = append(kept, fmt.Sprintf("%s (still needed by %s)",
 				featureLabel(feat), strings.Join(coreDisplayNames(coresNeeding(remaining, feat)), ", ")))
-			emit(ProvisionStep{Name: "keep " + featureLabel(feat), OK: true,
-				Msg: "still required by " + strings.Join(coreDisplayNames(coresNeeding(remaining, feat)), ", ")})
+			emit(ProvisionStep{
+				Name: "keep " + featureLabel(feat), OK: true,
+				Msg: "still required by " + strings.Join(coreDisplayNames(coresNeeding(remaining, feat)), ", "),
+			})
 			continue
 		}
 		emit(removeFeature(feat))
@@ -439,8 +448,10 @@ func (s *CoreService) runCoreUninstall(selected []string, emit func(ProvisionSte
 	//    buys nothing that the next boot does not.
 	if len(remaining) == 0 {
 		removed := removeIfPresent(modulesLoadConf)
-		emit(ProvisionStep{Name: "persist " + modulesLoadConf, OK: true,
-			Msg: removedMsg(removed)})
+		emit(ProvisionStep{
+			Name: "persist " + modulesLoadConf, OK: true,
+			Msg: removedMsg(removed),
+		})
 
 		// 5b. The last core is gone, so the host-wide data-plane settings have nobody
 		//     left to serve. Neither of these was ever undone by a per-core uninstall,
@@ -461,9 +472,11 @@ func (s *CoreService) runCoreUninstall(selected []string, emit func(ProvisionSte
 				mods = append(mods, m)
 			}
 		}
-		err := os.WriteFile(modulesLoadConf, []byte(strings.Join(dedupe(mods), "\n")+"\n"), 0644)
-		emit(ProvisionStep{Name: "persist " + modulesLoadConf, OK: err == nil,
-			Msg: msgOrOK(err)})
+		err := os.WriteFile(modulesLoadConf, []byte(strings.Join(dedupe(mods), "\n")+"\n"), 0o644)
+		emit(ProvisionStep{
+			Name: "persist " + modulesLoadConf, OK: err == nil,
+			Msg: msgOrOK(err),
+		})
 	}
 
 	// 6. Record what the host is now installed for. Done last: everything above
@@ -487,8 +500,10 @@ func (s *CoreService) runCoreUninstall(selected []string, emit func(ProvisionSte
 	//    host to remove one unrelated core would be an outage nobody asked for.
 	if affected := coresSharingWith(selected, remaining); len(affected) > 0 {
 		s.reinitCores(affected)
-		emit(ProvisionStep{Name: "reconcile shared cores", OK: true,
-			Msg: strings.Join(coreDisplayNames(affected), ", ")})
+		emit(ProvisionStep{
+			Name: "reconcile shared cores", OK: true,
+			Msg: strings.Join(coreDisplayNames(affected), ", "),
+		})
 	}
 
 	// Nftables/routing are shared by the whole data plane and stay put; the
@@ -527,10 +542,10 @@ func restoreDisabledUnits(selected []string, emit func(ProvisionStep)) string {
 			continue
 		}
 		if *snap.WasEnabled {
-			_ = exec.Command("systemctl", "enable", unit).Run()
+			_ = exec.CommandContext(context.Background(), "systemctl", "enable", unit).Run()
 		}
 		if snap.WasActive != nil && *snap.WasActive {
-			_ = exec.Command("systemctl", "start", unit).Run()
+			_ = exec.CommandContext(context.Background(), "systemctl", "start", unit).Run()
 		}
 		if *snap.WasEnabled || (snap.WasActive != nil && *snap.WasActive) {
 			restored = append(restored, unit)
@@ -540,7 +555,7 @@ func restoreDisabledUnits(selected []string, emit func(ProvisionStep)) string {
 	if len(restored) == 0 {
 		return ""
 	}
-	_ = exec.Command("systemctl", "daemon-reload").Run()
+	_ = exec.CommandContext(context.Background(), "systemctl", "daemon-reload").Run()
 	emit(ProvisionStep{Name: "restore host services", OK: true, Msg: strings.Join(restored, ", ")})
 	return "re-enabled the host's own " + strings.Join(restored, ", ")
 }
@@ -562,8 +577,10 @@ func restoreEthtoolState(selected []string, emit func(ProvisionStep)) {
 			continue
 		}
 		err := restoreGro(iface, snap.Prev)
-		emit(ProvisionStep{Name: "restore GRO on " + iface, OK: err == nil, Warn: err != nil,
-			Msg: msgOrOK(err)})
+		emit(ProvisionStep{
+			Name: "restore GRO on " + iface, OK: err == nil, Warn: err != nil,
+			Msg: msgOrOK(err),
+		})
 		if err == nil {
 			manifest.RemoveEntry(manifest.KindEthtool, id)
 		}
@@ -589,7 +606,7 @@ func restoreGro(iface, prev string) error {
 	if prev != "on" && prev != "off" {
 		return fmt.Errorf("no usable previous GRO setting (%q)", prev)
 	}
-	return exec.Command("ethtool", "-K", iface, "gro", prev).Run()
+	return exec.CommandContext(context.Background(), "ethtool", "-K", iface, "gro", prev).Run()
 }
 
 // sharedDaemonKeeper returns the first remaining core that runs the SAME daemon
@@ -675,14 +692,18 @@ func coresNeeding(names []string, feat string) []string {
 func removeFeature(feat string) ProvisionStep {
 	switch feat {
 	case featPppd, featAccel:
-		return ProvisionStep{Name: "remove " + featureLabel(feat), OK: true, Warn: true,
-			Msg: "the bundle tree is the bundle layer's (bundle/build wave); it stays until that wave's removal half lands"}
+		return ProvisionStep{
+			Name: "remove " + featureLabel(feat), OK: true, Warn: true,
+			Msg: "the bundle tree is the bundle layer's (bundle/build wave); it stays until that wave's removal half lands",
+		}
 
 	case featPptpCtrl:
 		// procmgr.LinkPptpCtrl delegated to the bundle provider; the provider's
 		// link target is not named here, so the unlink is the bundle wave's too.
-		return ProvisionStep{Name: "remove pptpctrl link", OK: true, Warn: true,
-			Msg: "the bundle tree is the bundle layer's (bundle/build wave); it stays until that wave's removal half lands"}
+		return ProvisionStep{
+			Name: "remove pptpctrl link", OK: true, Warn: true,
+			Msg: "the bundle tree is the bundle layer's (bundle/build wave); it stays until that wave's removal half lands",
+		}
 
 	case featStrongswan:
 		// Reached only when neither L2TP nor IKEv2 is installed any more, so the
@@ -712,8 +733,10 @@ func removeFeature(feat string) ProvisionStep {
 	case featKernelMods:
 		// The distro kernel package is never removed: it is the host's kernel,
 		// and something else may well depend on it now.
-		return ProvisionStep{Name: "kernel-modules package", OK: true,
-			Msg: "kept (a distro package; remove it yourself if nothing else needs it)"}
+		return ProvisionStep{
+			Name: "kernel-modules package", OK: true,
+			Msg: "kept (a distro package; remove it yourself if nothing else needs it)",
+		}
 
 	case featAmneziawg:
 		return awg.RemoveAmneziawgModule()
@@ -827,7 +850,7 @@ func restoreHostSysctls() []string {
 		if !found || prev == "" {
 			continue
 		}
-		if err := exec.Command("sysctl", "-w", key+"="+prev).Run(); err != nil {
+		if err := exec.CommandContext(context.Background(), "sysctl", "-w", key+"="+prev).Run(); err != nil {
 			log.Warning("could not restore sysctl", key, "to", prev, err)
 			continue
 		}

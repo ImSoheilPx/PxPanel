@@ -4,6 +4,7 @@
 package coresettings
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -88,14 +89,14 @@ func pinGrubKernel(version string) (string, error) {
 	}
 	id, err := findGrubEntryID(version)
 	if err != nil {
-		return "", fmt.Errorf("kernel %s installed but its GRUB entry wasn't found (%v) — pick it under 'Advanced options' at boot", version, err)
+		return "", fmt.Errorf("kernel %s installed but its GRUB entry wasn't found (%w) — pick it under 'Advanced options' at boot", version, err)
 	}
 	setter := "grub-set-default"
 	if !commandExists(setter) {
 		setter = "grub2-set-default"
 	}
-	if out, err := exec.Command(setter, id).CombinedOutput(); err != nil {
-		return "", fmt.Errorf("%s %q: %v: %s", setter, id, err, lastNonEmptyLine(string(out)))
+	if out, err := exec.CommandContext(context.Background(), setter, id).CombinedOutput(); err != nil {
+		return "", fmt.Errorf("%s %q: %w: %s", setter, id, err, lastNonEmptyLine(string(out)))
 	}
 	return "pinned GRUB to " + version + " (previous kernel kept as a fallback)", nil
 }
@@ -125,14 +126,14 @@ func setGrubDefaultSaved() error {
 	// back; nothing recorded this before, so a kernel-modules install changed how the
 	// host boots with no way to tell what it had been.
 	manifest.PrepareHostFile(path, "")
-	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644)
+	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644)
 }
 
 // regenerateGrub rebuilds grub.cfg using whichever generator the distro ships.
 func regenerateGrub() error {
 	if commandExists("update-grub") {
-		if out, err := exec.Command("update-grub").CombinedOutput(); err != nil {
-			return fmt.Errorf("update-grub: %v: %s", err, lastNonEmptyLine(string(out)))
+		if out, err := exec.CommandContext(context.Background(), "update-grub").CombinedOutput(); err != nil {
+			return fmt.Errorf("update-grub: %w: %s", err, lastNonEmptyLine(string(out)))
 		}
 		return nil
 	}
@@ -144,8 +145,8 @@ func regenerateGrub() error {
 	if !commandExists(mk) {
 		mk = "grub2-mkconfig"
 	}
-	if out, err := exec.Command(mk, "-o", cfg).CombinedOutput(); err != nil {
-		return fmt.Errorf("%s: %v: %s", mk, err, lastNonEmptyLine(string(out)))
+	if out, err := exec.CommandContext(context.Background(), mk, "-o", cfg).CombinedOutput(); err != nil {
+		return fmt.Errorf("%s: %w: %s", mk, err, lastNonEmptyLine(string(out)))
 	}
 	return nil
 }
@@ -222,8 +223,8 @@ func pinGrubbyKernel(version string) (string, error) {
 	if !pkgmgr.FileExists(vmlinuz) {
 		return "", fmt.Errorf("vmlinuz for %s not found under /boot", version)
 	}
-	if out, err := exec.Command("grubby", "--set-default", vmlinuz).CombinedOutput(); err != nil {
-		return "", fmt.Errorf("grubby --set-default %s: %v: %s", vmlinuz, err, lastNonEmptyLine(string(out)))
+	if out, err := exec.CommandContext(context.Background(), "grubby", "--set-default", vmlinuz).CombinedOutput(); err != nil {
+		return "", fmt.Errorf("grubby --set-default %s: %w: %s", vmlinuz, err, lastNonEmptyLine(string(out)))
 	}
 	return "set default kernel to " + version + " via grubby", nil
 }
@@ -243,8 +244,8 @@ func pinSystemdBootKernel(version string) (string, error) {
 			if !strings.Contains(string(body), version) {
 				continue
 			}
-			if out, err := exec.Command("bootctl", "set-default", e.Name()).CombinedOutput(); err != nil {
-				return "", fmt.Errorf("bootctl set-default %s: %v: %s", e.Name(), err, lastNonEmptyLine(string(out)))
+			if out, err := exec.CommandContext(context.Background(), "bootctl", "set-default", e.Name()).CombinedOutput(); err != nil {
+				return "", fmt.Errorf("bootctl set-default %s: %w: %s", e.Name(), err, lastNonEmptyLine(string(out)))
 			}
 			return "set systemd-boot default to " + e.Name(), nil
 		}

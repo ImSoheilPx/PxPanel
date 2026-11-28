@@ -49,6 +49,9 @@ const INBOUND_PROTOCOL_COLORS: Record<string, string> = {
   mixed: 'lime',
   tunnel: 'orange',
   tuic: 'orange',
+  // The vpn-ui relay protocols (ssh gateway / telemt mtproto).
+  ssh: 'geekblue',
+  'mtproto-c': 'purple',
 };
 
 const INBOUND_CHIP_LIMIT = 1;

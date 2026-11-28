@@ -496,7 +496,8 @@ func settingsHoldClients(protocol model.Protocol, settings string) bool {
 	// protocol rather than waiting for the first reconcile to make the inbound
 	// assignable.
 	if protocol == model.WireGuard || protocol == defaults.ProtoWGC || protocol == defaults.ProtoAWG ||
-		protocol == defaults.ProtoGRE || protocol == defaults.ProtoSSH || protocol == defaults.ProtoMTProto {
+		protocol == defaults.ProtoGRE || protocol == defaults.ProtoSSH || protocol == defaults.ProtoMTProto ||
+		protocol == defaults.ProtoMTProtoC {
 		return true
 	}
 	var root map[string]any

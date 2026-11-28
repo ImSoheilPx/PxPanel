@@ -95,11 +95,12 @@ export function useVpnUninstallStatus(polling: boolean) {
   });
 }
 
-export function useVpnCoreLogs(core: string | null) {
+export function useVpnCoreLogs(core: string | null, pollMs = 0) {
   return useQuery({
     queryKey: keys.vpn.core.logs(core ?? ''),
     queryFn: () => fetchLogs(core as string),
     enabled: core !== null,
+    refetchInterval: pollMs > 0 ? pollMs : false,
   });
 }
 

@@ -93,6 +93,13 @@ const PROTOCOL_FIELDS: Record<VpnProtocol, FieldDef[]> = {
     { key: 'externalProxy', kind: 'bool' },
     { key: 'userLimit', kind: 'number', min: 0 },
   ],
+  'mtproto-c': [
+    { key: 'modeClassic', kind: 'bool' },
+    { key: 'modeSecure', kind: 'bool' },
+    { key: 'modeTls', kind: 'bool' },
+    { key: 'tlsDomain', kind: 'text' },
+    { key: 'userLimit', kind: 'number', min: 0 },
+  ],
 };
 
 const CERT_PATHS: Partial<Record<VpnProtocol, string>> = {
@@ -182,7 +189,7 @@ export default function VpnProtocolFields({ protocol, inboundId }: VpnProtocolFi
   return (
     <>
       {messageContextHolder}
-      {protocol !== 'ssh' && (
+      {protocol !== 'ssh' && protocol !== 'mtproto-c' && (
         <Form.Item
           label={t('pages.vpnProtocols.ipRanges')}
           tooltip={t('pages.vpnProtocols.ipRangesHint')}

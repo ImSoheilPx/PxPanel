@@ -22,6 +22,7 @@ import (
 	"github.com/ImSoheilPx/pxpanel/internal/tuic"
 	"github.com/ImSoheilPx/pxpanel/internal/util/common"
 	"github.com/ImSoheilPx/pxpanel/internal/util/random"
+	"github.com/ImSoheilPx/pxpanel/internal/vpn/defaults"
 	"github.com/ImSoheilPx/pxpanel/internal/xray"
 
 	"gorm.io/gorm"
@@ -510,7 +511,7 @@ func (s *ClientService) fillProtocolDefaultsAgainstExisting(c *model.Client, ib 
 		if c.Auth == "" {
 			c.Auth = strings.ReplaceAll(uuid.NewString(), "-", "")
 		}
-	case model.MTProto:
+	case model.MTProto, defaults.ProtoMTProtoC:
 		if c.Secret == "" {
 			c.Secret = model.GenerateFakeTLSSecret(mtprotoDomainFromSettings(ib.Settings))
 		}

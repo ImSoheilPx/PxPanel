@@ -167,7 +167,7 @@ func extractAccountCredential(account *model.Account, entry map[string]any, prot
 		defaults.ProtoSSTP, defaults.ProtoIKEv2, defaults.ProtoSSH:
 		set(&account.VpnUsername, str("id"))
 		set(&account.Password, str("password"))
-	case model.MTProto:
+	case model.MTProto, defaults.ProtoMTProtoC:
 		set(&account.Secret, str("secret"))
 	case defaults.ProtoWGC, defaults.ProtoAWG, defaults.ProtoGRE:
 		// Identity is the email and nothing reads "id"; there is no credential to lift.

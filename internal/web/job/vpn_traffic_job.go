@@ -16,9 +16,10 @@ package job
 //   - the level-triggered KillDisabledSessions sweep.
 //
 // The telemt mtproto relay's CollectTraffic/KillDisabledSessions are
-// deliberately NOT called: this panel's mtproto plane is the v3 mtg sidecar
-// (internal/mtproto + mtproto_job), and the vpn-ui telemt stack stays unlinked
-// from those rows.
+// deliberately NOT called here: this panel's plain mtproto plane is the v3 mtg
+// sidecar (internal/mtproto + mtproto_job), and the vpn-ui telemt stack
+// (mtproto-c) is driven by the SAME service methods keyed off the mtproto-c
+// rows — wired through the controller hooks and this job's mtproto arm below.
 
 import (
 	"github.com/ImSoheilPx/pxpanel/internal/database/model"
@@ -26,9 +27,11 @@ import (
 	"github.com/ImSoheilPx/pxpanel/internal/vpn"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/accounts"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/awg"
+	"github.com/ImSoheilPx/pxpanel/internal/vpn/coresettings"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/gre"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/ikev2"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/l2tp"
+	mtpsvc "github.com/ImSoheilPx/pxpanel/internal/vpn/mtproto"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/nftables"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/ocserv"
 	"github.com/ImSoheilPx/pxpanel/internal/vpn/openvpn"
@@ -63,6 +66,8 @@ type VpnTrafficJob struct {
 	ocserv  ocserv.OcservService
 	sstp    sstp.SstpService
 
+	mtproto mtpsvc.MtprotoService
+
 	nft nftables.Service
 }
 
@@ -87,13 +92,23 @@ func (j *VpnTrafficJob) Run() {
 	// family re-adds enabled devices and removes disabled ones; a removed peer
 	// cannot complete a handshake, so disable/quota enforcement is HARD. GRE
 	// matters MORE: no handshake to refuse, the reconcile IS the enforcement).
-	if err := j.wgc.GenerateAllConfigs(); err != nil {
+	//
+	// Skipped for a manually-stopped core (coresettings.CoreManuallyStopped):
+	// GenerateAllConfigs re-plumbs the kernel state from the DB every tick, so
+	// without the latch a Core Settings stop would be undone within seconds.
+	if coresettings.CoreManuallyStopped("wgc") {
+		logger.Debug("wgc: manually stopped; skipping peer reconcile")
+	} else if err := j.wgc.GenerateAllConfigs(); err != nil {
 		logger.Debug("wgc: peer reconcile failed:", err)
 	}
-	if err := j.awg.GenerateAllConfigs(); err != nil {
+	if coresettings.CoreManuallyStopped("awg") {
+		logger.Debug("awg: manually stopped; skipping peer reconcile")
+	} else if err := j.awg.GenerateAllConfigs(); err != nil {
 		logger.Debug("awg: peer reconcile failed:", err)
 	}
-	if err := j.gre.GenerateAllConfigs(); err != nil {
+	if coresettings.CoreManuallyStopped("gre") {
+		logger.Debug("gre: manually stopped; skipping peer reconcile")
+	} else if err := j.gre.GenerateAllConfigs(); err != nil {
 		logger.Debug("gre: peer reconcile failed:", err)
 	}
 	// IKEv2 psk/eap-tls authenticate locally at charon, so the sweep only
@@ -158,6 +173,12 @@ func (j *VpnTrafficJob) Run() {
 	// io.Copy tallies); records arrive already stamped with their inbound.
 	clientTraffics = append(clientTraffics, j.ssh.CollectTraffic()...)
 
+	// The telemt relay keeps ITS own per-account counters too (the loopback
+	// Prometheus scrape): the nft per-IP path cannot see it (no per-client IP)
+	// and would fail silently. mtproto-c rows only — the plain mtproto rows
+	// belong to the v3 mtg sidecar (internal/mtproto + mtproto_job).
+	clientTraffics = append(clientTraffics, j.mtproto.CollectTraffic()...)
+
 	// Level-triggered enforcement: disconnect any STILL-connected client that is
 	// no longer allowed (quota/expiry hit, or disabled in settings). The
 	// edge-triggered paths only fire on the exact tick a quota is first crossed;
@@ -169,6 +190,10 @@ func (j *VpnTrafficJob) Run() {
 	j.sstp.KillDisabledSessions()
 	j.ikev2.KillDisabledSessions()
 	j.ssh.KillDisabledSessions()
+	// telemt's kill sweep is a config re-render: [access.user_enabled] is
+	// re-derived from client_traffics and the hot-reload watcher drops the
+	// cancelled accounts' live sessions (no daemon restart).
+	j.mtproto.KillDisabledSessions()
 
 	if len(clientTraffics) == 0 {
 		return

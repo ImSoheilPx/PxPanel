@@ -8,6 +8,7 @@
 package coresettings
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -90,7 +91,7 @@ func (s *CoreService) runProvisionSteps(emit func(ProvisionStep), cores []string
 			emit(ProvisionStep{Name: "module " + m, OK: true, Msg: "already loaded"})
 			continue
 		}
-		out, err := exec.Command("modprobe", m).CombinedOutput()
+		out, err := exec.CommandContext(context.Background(), "modprobe", m).CombinedOutput()
 		if err == nil {
 			emit(ProvisionStep{Name: "modprobe " + m, OK: true, Msg: "loaded"})
 		} else {
@@ -98,8 +99,10 @@ func (s *CoreService) runProvisionSteps(emit func(ProvisionStep), cores []string
 			// the kernel-modules step below installs it (rebooting into a fuller
 			// kernel when the module only ships there). Flag as a warning, not an
 			// error, so the console doesn't look broken mid-run.
-			emit(ProvisionStep{Name: "modprobe " + m, OK: true, Warn: true,
-				Msg: "not in the running kernel — resolving below", Log: strings.TrimSpace(string(out))})
+			emit(ProvisionStep{
+				Name: "modprobe " + m, OK: true, Warn: true,
+				Msg: "not in the running kernel — resolving below", Log: strings.TrimSpace(string(out)),
+			})
 		}
 	}
 
@@ -128,7 +131,7 @@ func (s *CoreService) runProvisionSteps(emit func(ProvisionStep), cores []string
 			emit(ProvisionStep{Name: "module " + m, OK: true, Msg: msg})
 			continue
 		}
-		if exec.Command("modprobe", m).Run() == nil {
+		if exec.CommandContext(context.Background(), "modprobe", m).Run() == nil {
 			loadableOptional = append(loadableOptional, m)
 			emit(ProvisionStep{Name: "modprobe " + m, OK: true, Msg: "loaded (optional)"})
 		}
@@ -138,10 +141,10 @@ func (s *CoreService) runProvisionSteps(emit func(ProvisionStep), cores []string
 	// doesn't log a failure each boot for an optional module the kernel dropped.
 	modConf := strings.Join(append(append([]string{}, requiredModules...), loadableOptional...), "\n") + "\n"
 	manifest.PrepareHostFile(modulesLoadConf, "")
-	err := os.WriteFile(modulesLoadConf, []byte(modConf), 0644)
+	err := os.WriteFile(modulesLoadConf, []byte(modConf), 0o644)
 	emit(ProvisionStep{Name: "persist " + modulesLoadConf, OK: err == nil, Msg: msgOrOK(err)})
 
-	err = exec.Command("sysctl", "-w", "net.ipv4.ip_forward=1").Run()
+	err = exec.CommandContext(context.Background(), "sysctl", "-w", "net.ipv4.ip_forward=1").Run()
 	emit(ProvisionStep{Name: "sysctl net.ipv4.ip_forward=1", OK: err == nil, Msg: msgOrOK(err)})
 
 	// Persist ip_forward plus loose rp_filter. Fedora/RHEL default rp_filter to
@@ -155,7 +158,7 @@ func (s *CoreService) runProvisionSteps(emit func(ProvisionStep), cores []string
 	// uninstall used to leave this drop-in behind forever, so a host kept loose
 	// rp_filter across every reboot long after the last VPN core was removed).
 	manifest.PrepareHostFile(sysctlDropIn, "")
-	err = os.WriteFile(sysctlDropIn, []byte(sysctlConf), 0644)
+	err = os.WriteFile(sysctlDropIn, []byte(sysctlConf), 0o644)
 	emit(ProvisionStep{Name: "persist " + sysctlDropIn, OK: err == nil, Msg: msgOrOK(err)})
 
 	// Apply loose rp_filter now and, when firewalld is active (Fedora/RHEL), trust
@@ -172,11 +175,15 @@ func (s *CoreService) runProvisionSteps(emit func(ProvisionStep), cores []string
 	b := procmgr.Bundles()
 	wanted := daemonsFor(target)
 	if len(wanted) > 0 && b.DaemonPath(wanted[0]) != "" {
-		emit(ProvisionStep{Name: "extract bundled daemons", OK: true,
-			Msg: fmt.Sprintf("%d daemon(s) resolvable via the bundle layer", len(wanted))})
+		emit(ProvisionStep{
+			Name: "extract bundled daemons", OK: true,
+			Msg: fmt.Sprintf("%d daemon(s) resolvable via the bundle layer", len(wanted)),
+		})
 	} else if len(wanted) > 0 {
-		emit(ProvisionStep{Name: "extract bundled daemons", OK: true, Warn: true,
-			Msg: "no bundle layer wired (bundle/build wave); daemons resolve from PATH — install them or wire the bundle provider"})
+		emit(ProvisionStep{
+			Name: "extract bundled daemons", OK: true, Warn: true,
+			Msg: "no bundle layer wired (bundle/build wave); daemons resolve from PATH — install them or wire the bundle provider",
+		})
 	}
 
 	// strongSwan (IKEv2 + L2TP/IPsec): extract the relocatable tree and link
@@ -252,8 +259,10 @@ func (s *CoreService) runProvisionSteps(emit func(ProvisionStep), cores []string
 	// deny-listed after the reboot. Especially important on the reboot-required path,
 	// where the modules only load on the next boot and must not be deny-listed then.
 	if cleared, ulog := pkgmgr.UnblacklistVpnModules(); len(cleared) > 0 {
-		emit(ProvisionStep{Name: "enable VPN modules", OK: true,
-			Msg: "cleared distro deny-list/disable for " + strings.Join(cleared, ", ") + " (auto-loads on boot)", Log: ulog})
+		emit(ProvisionStep{
+			Name: "enable VPN modules", OK: true,
+			Msg: "cleared distro deny-list/disable for " + strings.Join(cleared, ", ") + " (auto-loads on boot)", Log: ulog,
+		})
 
 		// An `install <mod> /bin/false` rule blocks even the explicit modprobe run
 		// earlier in this function, so a just-freed module isn't loaded yet. Load any
@@ -263,7 +272,7 @@ func (s *CoreService) runProvisionSteps(emit func(ProvisionStep), cores []string
 			if moduleLoaded(m) {
 				continue
 			}
-			if exec.Command("modprobe", m).Run() == nil && moduleLoaded(m) {
+			if exec.CommandContext(context.Background(), "modprobe", m).Run() == nil && moduleLoaded(m) {
 				loaded = append(loaded, m)
 			}
 		}
@@ -316,14 +325,18 @@ func (s *CoreService) provisionKernelModules(emit func(ProvisionStep), want []st
 
 	pkg := pkgmgr.KernelModulesPackage()
 	if pkg == "" {
-		emit(ProvisionStep{Name: "kernel modules", OK: false,
+		emit(ProvisionStep{
+			Name: "kernel modules", OK: false,
 			Msg: "missing " + strings.Join(missing, ", ") + " on " + distro +
-				" — no kernel-modules package known for this distro; load them manually"})
+				" — no kernel-modules package known for this distro; load them manually",
+		})
 		return nil, ""
 	}
 
-	emit(ProvisionStep{Name: "kernel modules (" + distro + ")", OK: true,
-		Msg: "missing " + strings.Join(missing, ", ") + " — installing " + pkg})
+	emit(ProvisionStep{
+		Name: "kernel modules (" + distro + ")", OK: true,
+		Msg: "missing " + strings.Join(missing, ", ") + " — installing " + pkg,
+	})
 
 	installed, still, newKernel, ulog, err := pkgmgr.InstallKernelModules(want)
 	if err != nil {
@@ -331,21 +344,27 @@ func (s *CoreService) provisionKernelModules(emit func(ProvisionStep), want []st
 		return nil, ""
 	}
 	if len(still) == 0 {
-		emit(ProvisionStep{Name: "install " + installed, OK: true,
-			Msg: "modules loaded into the running kernel — no reboot needed", Log: ulog})
+		emit(ProvisionStep{
+			Name: "install " + installed, OK: true,
+			Msg: "modules loaded into the running kernel — no reboot needed", Log: ulog,
+		})
 		return nil, ""
 	}
 
 	// Whatever is still missing only exists in a freshly installed kernel that
 	// isn't booted yet. Report it and make the bootloader boot that kernel.
 	if newKernel == "" {
-		emit(ProvisionStep{Name: "install " + installed, OK: true, Warn: true,
-			Msg: "installed; " + strings.Join(still, ", ") + " load after a reboot into the new kernel", Log: ulog})
+		emit(ProvisionStep{
+			Name: "install " + installed, OK: true, Warn: true,
+			Msg: "installed; " + strings.Join(still, ", ") + " load after a reboot into the new kernel", Log: ulog,
+		})
 		return still, installed
 	}
 
-	emit(ProvisionStep{Name: "install " + installed, OK: true, Warn: true,
-		Msg: "installed kernel " + newKernel + "; " + strings.Join(still, ", ") + " load after reboot", Log: ulog})
+	emit(ProvisionStep{
+		Name: "install " + installed, OK: true, Warn: true,
+		Msg: "installed kernel " + newKernel + "; " + strings.Join(still, ", ") + " load after reboot", Log: ulog,
+	})
 
 	bootMsg, bootErr := ensureBootloaderBootsKernel(newKernel)
 	emit(ProvisionStep{Name: "set default boot kernel", OK: bootErr == nil, Msg: bootStepMsg(bootMsg, bootErr)})
@@ -493,16 +512,16 @@ func (s *CoreService) Reboot() error {
 	go func() {
 		time.Sleep(1500 * time.Millisecond)
 		if commandExists("systemctl") {
-			if err := exec.Command("systemctl", "reboot").Run(); err == nil {
+			if err := exec.CommandContext(context.Background(), "systemctl", "reboot").Run(); err == nil {
 				return
 			}
 		}
 		if commandExists("reboot") {
-			if err := exec.Command("reboot").Run(); err == nil {
+			if err := exec.CommandContext(context.Background(), "reboot").Run(); err == nil {
 				return
 			}
 		}
-		_ = exec.Command("shutdown", "-r", "now").Run()
+		_ = exec.CommandContext(context.Background(), "shutdown", "-r", "now").Run()
 	}()
 	return nil
 }
@@ -520,7 +539,7 @@ func firewallStepMsg() string {
 const vpnAddrSpace = "10.0.0.0/12"
 
 func firewalldRunning() bool {
-	out, err := exec.Command("firewall-cmd", "--state").CombinedOutput()
+	out, err := exec.CommandContext(context.Background(), "firewall-cmd", "--state").CombinedOutput()
 	return err == nil && strings.TrimSpace(string(out)) == "running"
 }
 

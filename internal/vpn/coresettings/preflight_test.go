@@ -25,18 +25,30 @@ func TestCoreShouldProbeConflictsDecisionTable(t *testing.T) {
 		want                         bool
 		why                          string
 	}{
-		{installed: true, recorded: false, want: true,
-			why: "the baseline GUESS said installed but nothing was provisioned: this is the hole"},
-		{installed: false, recorded: false, want: true,
-			why: "nothing provisioned and nothing claimed installed"},
-		{installed: true, recorded: true, want: false,
-			why: "genuinely installed: the artifacts are ours and the manifest is the record"},
-		{installed: false, recorded: true, want: true,
-			why: "recorded state, core not installed: still offered, so still probed"},
-		{builtin: true, installed: false, recorded: false, want: false,
-			why: "a built-in core installs nothing, so it collides with nothing"},
-		{builtin: true, installed: true, recorded: true, want: false,
-			why: "built-in, whatever else is true"},
+		{
+			installed: true, recorded: false, want: true,
+			why: "the baseline GUESS said installed but nothing was provisioned: this is the hole",
+		},
+		{
+			installed: false, recorded: false, want: true,
+			why: "nothing provisioned and nothing claimed installed",
+		},
+		{
+			installed: true, recorded: true, want: false,
+			why: "genuinely installed: the artifacts are ours and the manifest is the record",
+		},
+		{
+			installed: false, recorded: true, want: true,
+			why: "recorded state, core not installed: still offered, so still probed",
+		},
+		{
+			builtin: true, installed: false, recorded: false, want: false,
+			why: "a built-in core installs nothing, so it collides with nothing",
+		},
+		{
+			builtin: true, installed: true, recorded: true, want: false,
+			why: "built-in, whatever else is true",
+		},
 	}
 	for _, c := range cases {
 		got := coreShouldProbeConflicts(c.builtin, c.installed, c.recorded)
@@ -54,7 +66,7 @@ func TestPreflightProbeDetectsAnExistingFileAndDirectory(t *testing.T) {
 	dir := t.TempDir()
 
 	file := filepath.Join(dir, "ipsec.secrets")
-	if err := os.WriteFile(file, []byte(": PSK \"theirs\"\n"), 0600); err != nil {
+	if err := os.WriteFile(file, []byte(": PSK \"theirs\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if c := preflightFile(file); c == nil {
@@ -67,7 +79,7 @@ func TestPreflightProbeDetectsAnExistingFileAndDirectory(t *testing.T) {
 	}
 
 	sub := filepath.Join(dir, "ocserv")
-	if err := os.MkdirAll(sub, 0755); err != nil {
+	if err := os.MkdirAll(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if c := preflightDir(sub); c == nil {

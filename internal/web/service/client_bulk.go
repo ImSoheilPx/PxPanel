@@ -13,6 +13,7 @@ import (
 	"github.com/ImSoheilPx/pxpanel/internal/database/model"
 	"github.com/ImSoheilPx/pxpanel/internal/logger"
 	"github.com/ImSoheilPx/pxpanel/internal/util/common"
+	"github.com/ImSoheilPx/pxpanel/internal/vpn/defaults"
 	"github.com/ImSoheilPx/pxpanel/internal/xray"
 
 	"gorm.io/gorm"
@@ -1697,6 +1698,12 @@ func applyBulkSidecar(inboundSvc *InboundService, inboundId int, protocol model.
 	switch protocol {
 	case model.MTProto:
 		inboundSvc.applyLocalMtproto(inboundId)
+	case defaults.ProtoMTProtoC:
+		// The telemt daemon reads its account set from its config file, which
+		// the vpn hooks' client-only reconcile (onMtprotoClientChanged →
+		// EnsureServicesRunning + GenerateAllConfigs) refreshes. There is no
+		// mtg-style push for this plane; the reconcile is the apply.
+		inboundSvc.applyLocalMtprotoC(inboundId)
 	case model.AmneziaWG:
 		inboundSvc.applyLocalAmneziaWG(inboundId)
 	case model.TUIC:

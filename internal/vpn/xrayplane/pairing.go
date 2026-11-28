@@ -46,7 +46,7 @@ func IsVpnProtocol(p model.Protocol) bool {
 // (GetSocksConfig), sharing this inbound's tag.
 // (vpn-ui web/service/inbound.go isRelayProtocol.)
 func IsRelayProtocol(p model.Protocol) bool {
-	return p == defaults.ProtoMTProto || p == defaults.ProtoSSH
+	return p == defaults.ProtoMTProto || p == defaults.ProtoMTProtoC || p == defaults.ProtoSSH
 }
 
 // GetDokodemoConfig builds the paired dokodemo-door inbound config for Xray.
@@ -160,7 +160,11 @@ func RelaySocksConfig(inbound *model.Inbound) *xray.InboundConfig {
 		return nil
 	}
 	switch inbound.Protocol {
-	case defaults.ProtoMTProto:
+	case defaults.ProtoMTProto, defaults.ProtoMTProtoC:
+		// Both mtproto planes share the telemt socks shape (mtproto-c IS the
+		// telemt plane under its own protocol string; plain mtproto rows are
+		// filtered out before InjectPairedInbounds by the caller, so this arm
+		// only ever sees mtproto-c rows in practice).
 		return MtprotoSocksConfig(inbound, accounts)
 	case defaults.ProtoSSH:
 		return SshSocksConfig(inbound, accounts)
@@ -191,7 +195,7 @@ func InjectPairedInbounds(cfg *xray.Config, inbounds []*model.Inbound) {
 		case IsVpnProtocol(inbound.Protocol):
 			dokodemoConfig := GetDokodemoConfig(inbound)
 			cfg.InboundConfigs = append(cfg.InboundConfigs, *dokodemoConfig)
-		case inbound.Protocol == defaults.ProtoMTProto, inbound.Protocol == defaults.ProtoSSH:
+		case inbound.Protocol == defaults.ProtoMTProto, inbound.Protocol == defaults.ProtoMTProtoC, inbound.Protocol == defaults.ProtoSSH:
 			// The loopback socks inbound each relay egresses through. Carries
 			// inbound.Tag, so operator routing rules target the relay like any
 			// other inbound. Nil for an adtag-mode mtproto inbound (middle-proxy

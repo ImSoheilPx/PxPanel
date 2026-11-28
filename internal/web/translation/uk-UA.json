@@ -2682,7 +2682,8 @@
         "wg-c": "WireGuard",
         "awg": "AmneziaWG",
         "gre": "GRE",
-        "ssh": "SSH"
+        "ssh": "SSH",
+        "mtproto-c": "MTProto-C"
       },
       "deleteConfirm": "Delete inbound “{name}”?",
       "accounts": "Accounts",
@@ -2783,7 +2784,15 @@
         "fouEnable": "FoU on",
         "fouEnableHint": "Wrap GRE in Foo-over-UDP so intermediate NATs accept the tunnel.",
         "fouPort": "FoU port",
-        "fouPortHint": "UDP port used for the FoU encapsulation. Clients must target this port."
+        "fouPortHint": "UDP port used for the FoU encapsulation. Clients must target this port.",
+        "modeClassic": "Класичний транспорт",
+        "modeClassicHint": "Приймати необфусковані транспорти MTProto (abridged / intermediate).",
+        "modeSecure": "Захищений транспорт (dd)",
+        "modeSecureHint": "Приймати обфускований транспорт \"dd\" (випадкове заповнення).",
+        "modeTls": "Транспорт FakeTLS (ee)",
+        "modeTlsHint": "Приймати транспорт FakeTLS: справжні TLS-записи навколо MTProto, найважчий для виявлення.",
+        "tlsDomain": "Домен FakeTLS",
+        "tlsDomainHint": "Домен, що пред'являється в маскувальному ServerHello FakeTLS. Клієнт може перевизначити його для акаунта."
       },
       "toasts": {
         "deleted": "Inbound deleted",
@@ -3037,7 +3046,9 @@
       "iprouteHint": "iproute2 (ip/tc) — required to create tunnel interfaces and shape traffic.",
       "modulesHint": "Kernel modules the cores need. Red tags are required but missing; grey are optional.",
       "uninstallInboundsModeHint": "Delete removes the inbounds and their accounts; keep leaves them but they cannot connect until a matching core is installed.",
-      "configTargetHint": "Config file to edit: per-inbound entries override what the core generated for that inbound."
+      "configTargetHint": "Config file to edit: per-inbound entries override what the core generated for that inbound.",
+      "start": "Запустити",
+      "startHint": "Запустити це ядро після ручної зупинки."
     }
   },
   "tgbot": {

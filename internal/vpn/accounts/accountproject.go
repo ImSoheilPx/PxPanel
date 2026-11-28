@@ -113,8 +113,9 @@ func applyAccountCredential(entry map[string]any, account *model.Account, inboun
 		// projection.
 		entry["id"] = account.VpnUsername
 		entry["password"] = account.Password
-	case model.MTProto:
-		// The secret is the credential; the identity is the email.
+	case model.MTProto, defaults.ProtoMTProtoC:
+		// The secret is the credential; the identity is the email. (mtproto-c
+		// is the same telemt settings shape under its own protocol string.)
 		entry["secret"] = account.Secret
 		preserveOrDefaultID(entry, account.Email)
 	case defaults.ProtoWGC, defaults.ProtoAWG, defaults.ProtoGRE, model.WireGuard:
@@ -606,7 +607,7 @@ func overwriteAccountCredential(account *model.Account, entry map[string]any, pr
 		defaults.ProtoSSTP, defaults.ProtoIKEv2, defaults.ProtoSSH:
 		set(&account.VpnUsername, str("id"))
 		set(&account.Password, str("password"))
-	case model.MTProto:
+	case model.MTProto, defaults.ProtoMTProtoC:
 		set(&account.Secret, str("secret"))
 	case defaults.ProtoWGC, defaults.ProtoAWG, defaults.ProtoGRE, model.WireGuard:
 		// Identity is the email and nothing reads "id"; no credential to lift.
@@ -1234,7 +1235,7 @@ func (s *AccountService) ensureCredentialsFor(tx *gorm.DB, accountId int, inboun
 		defaults.ProtoSSTP, defaults.ProtoIKEv2, defaults.ProtoSSH:
 		need(&account.VpnUsername, dashless)
 		need(&account.Password, dashless)
-	case model.MTProto:
+	case model.MTProto, defaults.ProtoMTProtoC:
 		// 32 hex characters, which is exactly a dashless uuid.
 		need(&account.Secret, dashless)
 	case defaults.ProtoWGC, defaults.ProtoAWG, defaults.ProtoGRE, model.WireGuard:

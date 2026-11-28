@@ -221,8 +221,8 @@ func parseSettingsClients(settings string) ([]map[string]any, bool) {
 // Xray terminates ITSELF, and can therefore match a routing rule's "user" field.
 //
 // The predicate is the complement of what InjectPairedInbounds consumes: the nine pool
-// VPN protocols (IsVpnProtocol) plus the two relays, mtproto and ssh, none of which
-// hand Xray a user list to match on.
+// VPN protocols (IsVpnProtocol) plus the relays (both mtproto planes and ssh), none of
+// which hand Xray a user list to match on.
 // (vpn-ui web/service/xray.go buildXrayNativeEmailSet.)
 func NativeEmailSet() map[string]bool {
 	out := map[string]bool{}
@@ -240,7 +240,7 @@ func NativeEmailSet() map[string]bool {
 		if !inbound.Enable {
 			continue
 		}
-		if IsVpnProtocol(inbound.Protocol) || inbound.Protocol == defaults.ProtoMTProto || inbound.Protocol == defaults.ProtoSSH {
+		if IsVpnProtocol(inbound.Protocol) || IsRelayProtocol(inbound.Protocol) {
 			continue
 		}
 		clients, ok := parseSettingsClients(inbound.Settings)

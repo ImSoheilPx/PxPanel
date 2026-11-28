@@ -2682,7 +2682,8 @@
         "wg-c": "WireGuard",
         "awg": "AmneziaWG",
         "gre": "GRE",
-        "ssh": "SSH"
+        "ssh": "SSH",
+        "mtproto-c": "MTProto-C"
       },
       "deleteConfirm": "Delete inbound “{name}”?",
       "accounts": "Accounts",
@@ -2783,7 +2784,15 @@
         "fouEnable": "FoU on",
         "fouEnableHint": "Wrap GRE in Foo-over-UDP so intermediate NATs accept the tunnel.",
         "fouPort": "FoU port",
-        "fouPortHint": "UDP port used for the FoU encapsulation. Clients must target this port."
+        "fouPortHint": "UDP port used for the FoU encapsulation. Clients must target this port.",
+        "modeClassic": "经典传输",
+        "modeClassicHint": "接受未混淆的 MTProto 传输（abridged / intermediate）。",
+        "modeSecure": "安全 (dd) 传输",
+        "modeSecureHint": "接受混淆的 “dd” 传输（随机填充）。",
+        "modeTls": "FakeTLS (ee) 传输",
+        "modeTlsHint": "接受 FakeTLS 传输：用真实 TLS 记录包裹 MTProto，最难被识别。",
+        "tlsDomain": "FakeTLS 域名",
+        "tlsDomainHint": "FakeTLS ServerHello 伪装中呈现的域名。客户端可按账号覆盖。"
       },
       "toasts": {
         "deleted": "Inbound deleted",
@@ -3037,7 +3046,9 @@
       "iprouteHint": "iproute2 (ip/tc) — required to create tunnel interfaces and shape traffic.",
       "modulesHint": "Kernel modules the cores need. Red tags are required but missing; grey are optional.",
       "uninstallInboundsModeHint": "Delete removes the inbounds and their accounts; keep leaves them but they cannot connect until a matching core is installed.",
-      "configTargetHint": "Config file to edit: per-inbound entries override what the core generated for that inbound."
+      "configTargetHint": "Config file to edit: per-inbound entries override what the core generated for that inbound.",
+      "start": "启动",
+      "startHint": "在手动停止后启动此核心。"
     }
   },
   "tgbot": {

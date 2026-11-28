@@ -118,7 +118,11 @@ func MtprotoInboundPolicyOf(settings string) MtprotoInboundPolicy {
 // Returns the input untouched when it is not MTProto, is not a JSON object, or is
 // already in the current shape.
 func LiftMtprotoSettingsBlob(protocol model.Protocol, settings string) string {
-	if protocol != defaults.ProtoMTProto {
+	// Both mtproto planes share the telemt settings shape, so the legacy-shape
+	// lift applies to each. (The plain mtproto string is the 3x-ui mtg sidecar
+	// plane; its rows simply never carry the pre-move client-level shape, and
+	// running the lift over them is a no-op.)
+	if protocol != defaults.ProtoMTProto && protocol != defaults.ProtoMTProtoC {
 		return settings
 	}
 	var raw map[string]json.RawMessage

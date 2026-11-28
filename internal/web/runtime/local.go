@@ -19,6 +19,7 @@ import (
 	"github.com/ImSoheilPx/pxpanel/internal/logger"
 	"github.com/ImSoheilPx/pxpanel/internal/mtproto"
 	"github.com/ImSoheilPx/pxpanel/internal/tuic"
+	"github.com/ImSoheilPx/pxpanel/internal/vpn/defaults"
 	"github.com/ImSoheilPx/pxpanel/internal/xray"
 )
 
@@ -77,6 +78,16 @@ func (l *Local) AddInbound(_ context.Context, ib *model.Inbound) error {
 		}
 		return mtproto.GetManager().Ensure(inst)
 	}
+	// mtproto-c is the vpn-ui telemt plane: its daemon is supervised by
+	// procmgr (internal/vpn/mtproto), not by this manager, and it pairs into
+	// Xray through the loopback socks the config build injects. Nothing to do
+	// in the xray-API runtime beyond flagging a resync below.
+	if ib.Protocol == defaults.ProtoMTProtoC {
+		if l.deps.SetNeedRestart != nil {
+			l.deps.SetNeedRestart()
+		}
+		return nil
+	}
 	if ib.Protocol == model.AmneziaWG {
 		inst, ok := amneziawg.InstanceFromInbound(ib)
 		if !ok {
@@ -123,6 +134,15 @@ func (l *Local) DelInbound(_ context.Context, ib *model.Inbound) error {
 		mtproto.GetManager().Remove(ib.Id)
 		return nil
 	}
+	if ib.Protocol == defaults.ProtoMTProtoC {
+		// The telemt daemon is reconciled by the vpn hooks (RestartServices
+		// stops children whose inbound went away); flag the Xray resync so the
+		// paired socks inbound is torn down promptly.
+		if l.deps.SetNeedRestart != nil {
+			l.deps.SetNeedRestart()
+		}
+		return nil
+	}
 	if ib.Protocol == model.AmneziaWG {
 		removeAmneziaWG(ib.Id)
 		// The removed inbound may have been the only one backing Xray's
@@ -152,6 +172,14 @@ func (l *Local) DelInbound(_ context.Context, ib *model.Inbound) error {
 func (l *Local) UpdateInbound(ctx context.Context, oldIb, newIb *model.Inbound) error {
 	if oldIb.Protocol == model.MTProto || newIb.Protocol == model.MTProto {
 		return l.updateMtprotoInbound(ctx, oldIb, newIb)
+	}
+	if oldIb.Protocol == defaults.ProtoMTProtoC || newIb.Protocol == defaults.ProtoMTProtoC {
+		// The telemt daemon is reconciled by the vpn hooks; the runtime only
+		// needs the Xray resync for the paired socks inbound.
+		if oldIb.Protocol != newIb.Protocol && l.deps.SetNeedRestart != nil {
+			l.deps.SetNeedRestart()
+		}
+		return nil
 	}
 	if oldIb.Protocol == model.AmneziaWG || newIb.Protocol == model.AmneziaWG {
 		return l.updateAmneziaWGInbound(ctx, oldIb, newIb)
@@ -297,6 +325,15 @@ func (l *Local) AddUser(_ context.Context, ib *model.Inbound, userMap map[string
 	if ib.Protocol == model.MTProto || ib.Protocol == model.AmneziaWG {
 		return nil
 	}
+	if ib.Protocol == defaults.ProtoMTProtoC {
+		// The telemt daemon reads its account set from its config file (the vpn
+		// hooks regenerate it after the write); the Xray-side socks account
+		// list is fixed at config time and refreshed by the flagged restart.
+		if l.deps.SetNeedRestart != nil {
+			l.deps.SetNeedRestart()
+		}
+		return nil
+	}
 	return l.withAPI(func(api *xray.XrayAPI) error {
 		if ib.Protocol == model.WireGuard {
 			if keepAlive, ok := userMap["keepAlive"].(string); ok {
@@ -339,6 +376,13 @@ func (l *Local) RemoveUser(_ context.Context, ib *model.Inbound, email string) e
 		return nil
 	}
 	if ib.Protocol == model.MTProto || ib.Protocol == model.AmneziaWG {
+		return nil
+	}
+	if ib.Protocol == defaults.ProtoMTProtoC {
+		// Same as AddUser: the config file + flagged restart carry the change.
+		if l.deps.SetNeedRestart != nil {
+			l.deps.SetNeedRestart()
+		}
 		return nil
 	}
 	return l.withAPI(func(api *xray.XrayAPI) error {

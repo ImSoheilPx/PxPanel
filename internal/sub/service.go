@@ -27,6 +27,7 @@ import (
 	"github.com/ImSoheilPx/pxpanel/internal/util/maskcompat"
 	"github.com/ImSoheilPx/pxpanel/internal/util/random"
 	wgutil "github.com/ImSoheilPx/pxpanel/internal/util/wireguard"
+	"github.com/ImSoheilPx/pxpanel/internal/vpn/defaults"
 	"github.com/ImSoheilPx/pxpanel/internal/web/service"
 	"github.com/ImSoheilPx/pxpanel/internal/xray"
 )
@@ -864,7 +865,7 @@ func (s *SubService) loadInboundsBySubId(subId string) ([]*model.Inbound, error)
 		JOIN client_inbounds ON client_inbounds.inbound_id = inbounds.id
 		JOIN clients ON clients.id = client_inbounds.client_id
 		WHERE
-			inbounds.protocol in ('vmess','vless','trojan','shadowsocks','hysteria','wireguard','amneziawg','mtproto','tuic','masque')
+			inbounds.protocol in ('vmess','vless','trojan','shadowsocks','hysteria','wireguard','amneziawg','mtproto','mtproto-c','tuic','masque')
 			AND clients.sub_id = ? AND inbounds.enable = ?
 	)`, subId, true).Order("sub_sort_index ASC").Order("id ASC")
 	if cached {
@@ -1035,7 +1036,7 @@ func (s *SubService) GetLink(inbound *model.Inbound, email string) string {
 		return s.genShadowsocksLink(inbound, email)
 	case "hysteria":
 		return s.genHysteriaLink(inbound, email)
-	case "mtproto":
+	case "mtproto", "mtproto-c":
 		return s.genMtprotoLink(inbound, email)
 	case "wireguard":
 		return s.genWireguardLink(inbound, email)
@@ -1308,7 +1309,9 @@ func (s *SubService) genAmneziaWGLink(inbound *model.Inbound, email string) stri
 // genMtprotoLink builds one Telegram link per advertised endpoint with the client's FakeTLS secret.
 // It omits remarks because lenient parsers fold a fragment into the last query value.
 func (s *SubService) genMtprotoLink(inbound *model.Inbound, email string) string {
-	if inbound.Protocol != model.MTProto {
+	// Both mtproto planes carry the per-client FakeTLS secret and render the
+	// same tg:// deep link (mtproto-c is the telemt plane under its own string).
+	if inbound.Protocol != model.MTProto && inbound.Protocol != defaults.ProtoMTProtoC {
 		return ""
 	}
 	resolved, ok := s.clientForLink(inbound, email)
